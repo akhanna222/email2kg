@@ -27,7 +27,12 @@ const DocumentViewer: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="loading">Loading...</div>;
+    return (
+      <div className="loading">
+        <div className="spinner"></div>
+        Loading document...
+      </div>
+    );
   }
 
   if (!document) {

@@ -112,7 +112,10 @@ const TransactionList: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="loading">Loading...</div>
+        <div className="loading">
+          <div className="spinner"></div>
+          Loading transactions...
+        </div>
       ) : (
         <>
           <p className="total-count">Total: {total} transactions</p>

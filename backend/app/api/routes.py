@@ -10,6 +10,7 @@ from app.db.models import Document, Transaction, Email, User, ProcessingStatus
 from app.services.gmail_service import GmailService
 from app.services.processing_service import ProcessingService
 from app.services.query_service import QueryService
+from app.services.graph_service import GraphService
 from app.core.config import settings
 from pydantic import BaseModel
 
@@ -319,3 +320,26 @@ async def get_stats(db: Session = Depends(get_db)):
         "total_amount": round(total_amount, 2),
         "currency": "USD"
     }
+
+
+# ========== Knowledge Graph Routes ==========
+
+@router.get("/graph")
+async def get_knowledge_graph(db: Session = Depends(get_db)):
+    """Get complete knowledge graph with all entities and relationships."""
+    graph_service = GraphService(db)
+    return graph_service.build_knowledge_graph()
+
+
+@router.get("/graph/document/{document_id}")
+async def get_document_graph(document_id: int, db: Session = Depends(get_db)):
+    """Get knowledge graph for a specific document."""
+    graph_service = GraphService(db)
+    return graph_service.get_document_graph(document_id)
+
+
+@router.get("/graph/party/{party_id}")
+async def get_party_graph(party_id: int, db: Session = Depends(get_db)):
+    """Get knowledge graph for a specific party (vendor)."""
+    graph_service = GraphService(db)
+    return graph_service.get_party_graph(party_id)

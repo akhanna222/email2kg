@@ -22,7 +22,12 @@ const Dashboard: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="loading">Loading...</div>;
+    return (
+      <div className="loading">
+        <div className="spinner"></div>
+        Loading dashboard...
+      </div>
+    );
   }
 
   return (

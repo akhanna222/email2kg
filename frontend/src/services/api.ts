@@ -79,3 +79,19 @@ export const getStats = async (): Promise<Stats> => {
   const response = await api.get('/stats');
   return response.data;
 };
+
+// Knowledge Graph
+export const getKnowledgeGraph = async (): Promise<any> => {
+  const response = await api.get('/graph');
+  return response.data;
+};
+
+export const getDocumentGraph = async (documentId: number): Promise<any> => {
+  const response = await api.get(`/graph/document/${documentId}`);
+  return response.data;
+};
+
+export const getPartyGraph = async (partyId: number): Promise<any> => {
+  const response = await api.get(`/graph/party/${partyId}`);
+  return response.data;
+};

@@ -6,6 +6,7 @@ import DocumentViewer from './components/DocumentViewer';
 import Upload from './components/Upload';
 import Query from './components/Query';
 import GmailConnect from './components/GmailConnect';
+import KnowledgeGraph from './components/KnowledgeGraph';
 import './App.css';
 
 function App() {
@@ -24,6 +25,9 @@ function App() {
               <Link to="/transactions">Transactions</Link>
             </li>
             <li>
+              <Link to="/graph">Knowledge Graph</Link>
+            </li>
+            <li>
               <Link to="/upload">Upload PDF</Link>
             </li>
             <li>
@@ -39,6 +43,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/transactions" element={<TransactionList />} />
+            <Route path="/graph" element={<KnowledgeGraph />} />
             <Route path="/document/:id" element={<DocumentViewer />} />
             <Route path="/upload" element={<Upload />} />
             <Route path="/query" element={<Query />} />
