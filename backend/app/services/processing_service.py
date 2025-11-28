@@ -2,8 +2,10 @@ from sqlalchemy.orm import Session
 from app.db.models import Document, Transaction, Party, ProcessingStatus, DocumentType
 from app.services.pdf_service import PDFService
 from app.services.llm_service import LLMService
+from app.services.template_service import TemplateService
 from datetime import datetime
 from typing import Optional
+import time
 
 
 class ProcessingService:
@@ -13,6 +15,7 @@ class ProcessingService:
         self.db = db
         self.pdf_service = PDFService()
         self.llm_service = LLMService()
+        self.template_service = TemplateService(db)
 
     def process_document(self, document_id: int) -> bool:
         """
@@ -45,6 +48,7 @@ class ProcessingService:
                 return False
 
             # Step 2: Classify document
+            start_time = time.time()
             doc_type = self.llm_service.classify_document(extracted_text)
             document.document_type = DocumentType(doc_type)
 
@@ -55,10 +59,61 @@ class ProcessingService:
                 self.db.commit()
                 return True
 
-            # Step 3: Extract structured data
-            structured_data = self.llm_service.extract_structured_data(
-                extracted_text, doc_type
+            # Step 3: Try template-based extraction first
+            template = self.template_service.find_matching_template(
+                extracted_text,
+                DocumentType(doc_type)
             )
+
+            structured_data = None
+            extraction_method = "llm"  # Default to LLM
+            template_id = None
+
+            if template:
+                # Try template-based extraction
+                print(f"Found matching template: {template.name}")
+                template_result = self.template_service.extract_with_template(
+                    extracted_text,
+                    template
+                )
+
+                if template_result.get('data'):
+                    structured_data = template_result['data']
+                    extraction_method = "template"
+                    template_id = template.id
+
+                    # Update template stats
+                    self.template_service.update_template_stats(template.id, success=True)
+
+            # Fall back to LLM if template extraction failed or no template found
+            if not structured_data:
+                print("Using LLM extraction (no template or template failed)")
+                structured_data = self.llm_service.extract_structured_data(
+                    extracted_text, doc_type
+                )
+
+                # If LLM extraction was successful, create a new template
+                if structured_data.get('amount'):
+                    print("Creating new template from LLM extraction")
+                    self.template_service.create_template_from_extraction(
+                        document.id,
+                        DocumentType(doc_type),
+                        structured_data,
+                        extracted_text
+                    )
+
+            # Log the extraction
+            extraction_time = time.time() - start_time
+            self.template_service.log_extraction(
+                document_id=document.id,
+                template_id=template_id,
+                extraction_method=extraction_method,
+                fields_extracted=structured_data or {},
+                confidence_scores={},
+                success=bool(structured_data),
+                extraction_time=extraction_time
+            )
+
             document.extracted_data = structured_data
 
             # Step 4: Create or find party (vendor/merchant)

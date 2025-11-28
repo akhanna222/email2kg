@@ -11,6 +11,7 @@ from app.services.gmail_service import GmailService
 from app.services.processing_service import ProcessingService
 from app.services.query_service import QueryService
 from app.services.graph_service import GraphService
+from app.services.template_service import TemplateService
 from app.core.config import settings
 from pydantic import BaseModel
 
@@ -343,3 +344,122 @@ async def get_party_graph(party_id: int, db: Session = Depends(get_db)):
     """Get knowledge graph for a specific party (vendor)."""
     graph_service = GraphService(db)
     return graph_service.get_party_graph(party_id)
+
+
+# ========== Template Management Routes ==========
+
+@router.get("/templates")
+async def get_templates(
+    document_type: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Get all document templates, optionally filtered by document type."""
+    template_service = TemplateService(db)
+
+    from app.db.models import DocumentType as DocType
+    doc_type_enum = None
+
+    if document_type:
+        try:
+            doc_type_enum = DocType(document_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid document type: {document_type}")
+
+    templates = template_service.get_all_templates(doc_type_enum)
+
+    return {
+        "templates": [
+            {
+                "id": t.id,
+                "name": t.name,
+                "document_type": t.document_type.value,
+                "usage_count": t.usage_count,
+                "success_count": t.success_count,
+                "confidence_score": round(t.confidence_score, 2),
+                "is_active": t.is_active,
+                "created_at": t.created_at.isoformat(),
+                "last_updated": t.last_updated.isoformat() if t.last_updated else None
+            }
+            for t in templates
+        ]
+    }
+
+
+@router.get("/templates/{template_id}")
+async def get_template(template_id: int, db: Session = Depends(get_db)):
+    """Get detailed information about a specific template."""
+    template_service = TemplateService(db)
+    template = template_service.get_template(template_id)
+
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    return {
+        "id": template.id,
+        "name": template.name,
+        "document_type": template.document_type.value,
+        "template_schema": template.template_schema,
+        "keywords": template.keywords,
+        "vendor_pattern": template.vendor_pattern,
+        "usage_count": template.usage_count,
+        "success_count": template.success_count,
+        "confidence_score": round(template.confidence_score, 2),
+        "sample_documents": template.sample_documents,
+        "is_active": template.is_active,
+        "created_at": template.created_at.isoformat(),
+        "last_updated": template.last_updated.isoformat() if template.last_updated else None
+    }
+
+
+@router.delete("/templates/{template_id}")
+async def delete_template(template_id: int, db: Session = Depends(get_db)):
+    """Delete a template."""
+    template_service = TemplateService(db)
+    success = template_service.delete_template(template_id)
+
+    if not success:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    return {"message": "Template deleted successfully"}
+
+
+@router.get("/extraction-logs")
+async def get_extraction_logs(
+    document_id: Optional[int] = Query(None),
+    template_id: Optional[int] = Query(None),
+    limit: int = Query(100, le=1000),
+    offset: int = Query(0),
+    db: Session = Depends(get_db)
+):
+    """Get extraction logs for analysis and improvement."""
+    from app.db.models import ExtractionLog
+
+    query = db.query(ExtractionLog)
+
+    if document_id:
+        query = query.filter(ExtractionLog.document_id == document_id)
+    if template_id:
+        query = query.filter(ExtractionLog.template_id == template_id)
+
+    total = query.count()
+    logs = query.order_by(ExtractionLog.created_at.desc()).offset(offset).limit(limit).all()
+
+    return {
+        "total": total,
+        "logs": [
+            {
+                "id": log.id,
+                "document_id": log.document_id,
+                "template_id": log.template_id,
+                "extraction_method": log.extraction_method,
+                "fields_extracted": log.fields_extracted,
+                "confidence_scores": log.confidence_scores,
+                "extraction_time": round(log.extraction_time, 3) if log.extraction_time else None,
+                "success": log.success,
+                "error_message": log.error_message,
+                "manually_verified": log.manually_verified,
+                "created_at": log.created_at.isoformat()
+            }
+            for log in logs
+        ]
+    }

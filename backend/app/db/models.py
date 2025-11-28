@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, Text, Enum, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, Text, Enum, JSON, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -9,6 +9,12 @@ class DocumentType(str, enum.Enum):
     INVOICE = "invoice"
     RECEIPT = "receipt"
     BANK_STATEMENT = "bank_statement"
+    PURCHASE_ORDER = "purchase_order"
+    SALES_ORDER = "sales_order"
+    DELIVERY_NOTE = "delivery_note"
+    QUOTE = "quote"
+    CONTRACT = "contract"
+    TAX_DOCUMENT = "tax_document"
     OTHER = "other"
 
 
@@ -128,3 +134,100 @@ class User(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
     last_sync = Column(DateTime, nullable=True)
+
+
+class DocumentTemplate(Base):
+    __tablename__ = "document_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Template identification
+    name = Column(String, index=True)  # e.g., "Standard Invoice Template"
+    document_type = Column(Enum(DocumentType), index=True)
+
+    # Template definition
+    template_schema = Column(JSON)  # Field definitions and extraction rules
+    """
+    Example schema:
+    {
+        "fields": [
+            {
+                "name": "invoice_number",
+                "type": "string",
+                "required": true,
+                "patterns": ["Invoice #", "Invoice No:", "INV-"],
+                "location": "top_right"  # Optional: where typically found
+            },
+            {
+                "name": "total_amount",
+                "type": "float",
+                "required": true,
+                "patterns": ["Total:", "Amount Due:", "Grand Total:"],
+                "location": "bottom_right"
+            },
+            {
+                "name": "date",
+                "type": "date",
+                "required": true,
+                "patterns": ["Date:", "Invoice Date:", "Issued:"],
+                "location": "top_right"
+            },
+            {
+                "name": "vendor",
+                "type": "string",
+                "required": true,
+                "patterns": ["From:", "Vendor:", "Supplier:"],
+                "location": "top_left"
+            }
+        ],
+        "layout_hints": {
+            "header_section": [0, 0.25],  # Top 25% of document
+            "footer_section": [0.75, 1.0],  # Bottom 25%
+            "left_section": [0, 0.5],
+            "right_section": [0.5, 1.0]
+        }
+    }
+    """
+
+    # Template statistics and confidence
+    usage_count = Column(Integer, default=0)  # How many times used
+    success_count = Column(Integer, default=0)  # Successful extractions
+    confidence_score = Column(Float, default=0.0)  # success_count / usage_count
+
+    # Template characteristics for matching
+    keywords = Column(JSON)  # Common keywords found in this document type
+    vendor_pattern = Column(String, nullable=True)  # Regex pattern for vendor identification
+    layout_signature = Column(String, nullable=True)  # Hash of document layout characteristics
+
+    # Learning data
+    sample_documents = Column(JSON)  # Store references to sample documents
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Metadata
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_from_document_id = Column(Integer, ForeignKey("documents.id"), nullable=True)
+
+
+class ExtractionLog(Base):
+    __tablename__ = "extraction_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, ForeignKey("documents.id"))
+    template_id = Column(Integer, ForeignKey("document_templates.id"), nullable=True)
+
+    # Extraction details
+    extraction_method = Column(String)  # "template", "llm", "hybrid"
+    fields_extracted = Column(JSON)  # What was extracted
+    confidence_scores = Column(JSON)  # Confidence per field
+
+    # Quality metrics
+    extraction_time = Column(Float)  # Time taken in seconds
+    success = Column(Boolean)
+    error_message = Column(Text, nullable=True)
+
+    # Validation
+    manually_verified = Column(Boolean, default=False)
+    corrections = Column(JSON, nullable=True)  # User corrections
+
+    created_at = Column(DateTime, default=datetime.utcnow)

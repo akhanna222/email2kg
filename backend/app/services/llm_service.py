@@ -27,12 +27,18 @@ class LLMService:
             text: Extracted document text
 
         Returns:
-            Document type: invoice, receipt, bank_statement, or other
+            Document type
         """
         prompt = f"""Classify the following document into one of these categories:
 - invoice
 - receipt
 - bank_statement
+- purchase_order
+- sales_order
+- delivery_note
+- quote
+- contract
+- tax_document
 - other
 
 Document text:
@@ -44,7 +50,11 @@ Respond with ONLY the category name, nothing else."""
 
         # Normalize response
         doc_type = response.strip().lower()
-        if doc_type not in ["invoice", "receipt", "bank_statement", "other"]:
+        valid_types = ["invoice", "receipt", "bank_statement", "purchase_order",
+                       "sales_order", "delivery_note", "quote", "contract",
+                       "tax_document", "other"]
+
+        if doc_type not in valid_types:
             doc_type = "other"
 
         return doc_type
