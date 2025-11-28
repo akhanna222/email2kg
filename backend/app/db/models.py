@@ -45,6 +45,7 @@ class Document(Base):
     __tablename__ = "documents"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)  # Multi-user support
     filename = Column(String)
     file_path = Column(String)
     file_size = Column(Integer)
@@ -58,13 +59,20 @@ class Document(Base):
     extracted_text = Column(Text)
     extracted_data = Column(JSON)  # Store the full JSON extraction
 
+    # User feedback
+    needs_review = Column(Boolean, default=False)  # Flag for user review
+    user_verified = Column(Boolean, default=False)  # User has verified extraction
+    user_corrections = Column(JSON, nullable=True)  # User corrections to extraction
+
     # Timestamps
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     processed_at = Column(DateTime, nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
 
     # Relationships
     emails = relationship("Email", secondary="email_document_links", back_populates="documents")
     transactions = relationship("Transaction", back_populates="document")
+    user = relationship("User", back_populates="documents")
 
 
 class Party(Base):
@@ -125,15 +133,58 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
+    hashed_password = Column(String, nullable=False)
+    full_name = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    is_verified = Column(Boolean, default=False)
+
+    # Google OAuth (optional)
     google_id = Column(String, unique=True, index=True, nullable=True)
 
     # OAuth tokens
     gmail_access_token = Column(Text, nullable=True)
     gmail_refresh_token = Column(Text, nullable=True)
     gmail_token_expiry = Column(DateTime, nullable=True)
+    gmail_connected = Column(Boolean, default=False)
+
+    # User preferences
+    preferences = Column(JSON, default={})
 
     created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime, nullable=True)
     last_sync = Column(DateTime, nullable=True)
+
+    # Relationships
+    documents = relationship("Document", back_populates="user")
+
+
+class UserFeedback(Base):
+    __tablename__ = "user_feedback"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    document_id = Column(Integer, ForeignKey("documents.id"))
+    extraction_log_id = Column(Integer, ForeignKey("extraction_logs.id"), nullable=True)
+
+    # Feedback type
+    feedback_type = Column(String)  # "correction", "verification", "flag_error"
+
+    # Original vs corrected data
+    original_data = Column(JSON)
+    corrected_data = Column(JSON)
+
+    # Feedback details
+    field_name = Column(String, nullable=True)  # Which field was corrected
+    comments = Column(Text, nullable=True)
+    confidence_before = Column(Float, nullable=True)
+    confidence_after = Column(Float, default=1.0)  # User correction assumed 100% confident
+
+    # Status
+    status = Column(String, default="pending")  # pending, applied, dismissed
+    applied_to_template = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    applied_at = Column(DateTime, nullable=True)
 
 
 class DocumentTemplate(Base):

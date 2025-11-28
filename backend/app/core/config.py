@@ -9,6 +9,11 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     SECRET_KEY: str
 
+    # JWT Authentication
+    JWT_SECRET_KEY: str = ""  # Defaults to SECRET_KEY if not set
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
+
     # Database
     DATABASE_URL: str
 

@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.api.routes import router
+from app.api.auth_routes import router as auth_router
+from app.api.feedback_routes import router as feedback_router
 from app.core.config import settings
 from app.db.database import engine, Base
 
@@ -24,6 +26,8 @@ app.add_middleware(
 )
 
 # Include API routes
+app.include_router(auth_router)
+app.include_router(feedback_router)
 app.include_router(router, prefix="/api")
 
 # Serve uploaded files (for development)

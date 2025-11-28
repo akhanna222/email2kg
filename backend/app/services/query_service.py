@@ -2,14 +2,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from app.db.models import Transaction, Party, Document, DocumentType
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 
 class QueryService:
     """Service for answering predefined queries about the knowledge graph."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: Optional[int] = None):
         self.db = db
+        self.user_id = user_id
 
     def answer_query(self, query_type: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -43,25 +44,31 @@ class QueryService:
         """
         since_date = datetime.now() - timedelta(days=months * 30)
 
+        # Base query joining with Document for user filtering
+        base_query = self.db.query(Transaction).join(Document)
+        if self.user_id:
+            base_query = base_query.filter(Document.user_id == self.user_id)
+
         # Get total
-        total = self.db.query(
+        total = base_query.with_entities(
             func.sum(Transaction.amount)
         ).filter(
             Transaction.transaction_date >= since_date
         ).scalar() or 0.0
 
         # Get breakdown by type
-        by_type = self.db.query(
+        by_type_query = base_query.with_entities(
             Transaction.transaction_type,
             func.sum(Transaction.amount).label('total')
         ).filter(
             Transaction.transaction_date >= since_date
         ).group_by(
             Transaction.transaction_type
-        ).all()
+        )
+        by_type = by_type_query.all()
 
         # Get breakdown by month
-        by_month = self.db.query(
+        by_month_query = base_query.with_entities(
             func.date_trunc('month', Transaction.transaction_date).label('month'),
             func.sum(Transaction.amount).label('total')
         ).filter(
@@ -70,7 +77,8 @@ class QueryService:
             'month'
         ).order_by(
             'month'
-        ).all()
+        )
+        by_month = by_month_query.all()
 
         return {
             "query": f"Total spend last {months} months",
@@ -98,13 +106,19 @@ class QueryService:
         Returns:
             Dictionary with top vendors
         """
-        results = self.db.query(
+        query = self.db.query(
             Party.name,
             func.sum(Transaction.amount).label('total'),
             func.count(Transaction.id).label('count')
         ).join(
             Transaction, Transaction.party_id == Party.id
-        ).group_by(
+        )
+
+        # Filter by user if user_id is provided
+        if self.user_id:
+            query = query.join(Document).filter(Document.user_id == self.user_id)
+
+        results = query.group_by(
             Party.id, Party.name
         ).order_by(
             desc('total')
@@ -134,15 +148,21 @@ class QueryService:
         Returns:
             Dictionary with matching transactions
         """
-        transactions = self.db.query(
+        query = self.db.query(
             Transaction, Party, Document
         ).outerjoin(
             Party, Transaction.party_id == Party.id
-        ).outerjoin(
+        ).join(
             Document, Transaction.document_id == Document.id
         ).filter(
             Transaction.amount >= amount
-        ).order_by(
+        )
+
+        # Filter by user if user_id is provided
+        if self.user_id:
+            query = query.filter(Document.user_id == self.user_id)
+
+        transactions = query.order_by(
             desc(Transaction.amount)
         ).all()
 
@@ -167,17 +187,45 @@ class QueryService:
 
     def get_transaction_filters(self) -> Dict[str, List]:
         """Get available filter values for the UI."""
-        # Get unique vendors
-        vendors = self.db.query(Party.name).distinct().all()
+        # Base query for user filtering
+        if self.user_id:
+            # Get unique vendors for user's transactions
+            vendors = self.db.query(Party.name).join(
+                Transaction, Transaction.party_id == Party.id
+            ).join(
+                Document, Transaction.document_id == Document.id
+            ).filter(
+                Document.user_id == self.user_id
+            ).distinct().all()
 
-        # Get document types
-        doc_types = self.db.query(Transaction.transaction_type).distinct().all()
+            # Get document types for user's transactions
+            doc_types = self.db.query(Transaction.transaction_type).join(
+                Document, Transaction.document_id == Document.id
+            ).filter(
+                Document.user_id == self.user_id
+            ).distinct().all()
 
-        # Get date range
-        date_range = self.db.query(
-            func.min(Transaction.transaction_date).label('min_date'),
-            func.max(Transaction.transaction_date).label('max_date')
-        ).first()
+            # Get date range for user's transactions
+            date_range = self.db.query(
+                func.min(Transaction.transaction_date).label('min_date'),
+                func.max(Transaction.transaction_date).label('max_date')
+            ).join(
+                Document, Transaction.document_id == Document.id
+            ).filter(
+                Document.user_id == self.user_id
+            ).first()
+        else:
+            # Get all vendors
+            vendors = self.db.query(Party.name).distinct().all()
+
+            # Get all document types
+            doc_types = self.db.query(Transaction.transaction_type).distinct().all()
+
+            # Get date range for all transactions
+            date_range = self.db.query(
+                func.min(Transaction.transaction_date).label('min_date'),
+                func.max(Transaction.transaction_date).label('max_date')
+            ).first()
 
         return {
             "vendors": [v[0] for v in vendors],

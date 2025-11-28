@@ -1,14 +1,15 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.db.models import Document, Transaction, Party, Email, EmailDocumentLink
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 
 class GraphService:
     """Service for building knowledge graph data structure."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: Optional[int] = None):
         self.db = db
+        self.user_id = user_id
 
     def build_knowledge_graph(self) -> Dict[str, Any]:
         """
@@ -21,8 +22,19 @@ class GraphService:
         links = []
         node_map = {}  # Track node IDs to avoid duplicates
 
-        # Add Party nodes
-        parties = self.db.query(Party).all()
+        # Add Party nodes (only those involved in user's transactions)
+        if self.user_id:
+            # Get parties connected to user's documents
+            parties = self.db.query(Party).join(
+                Transaction, Transaction.party_id == Party.id
+            ).join(
+                Document, Transaction.document_id == Document.id
+            ).filter(
+                Document.user_id == self.user_id
+            ).distinct().all()
+        else:
+            parties = self.db.query(Party).all()
+
         for party in parties:
             node_id = f"party-{party.id}"
             nodes.append({
@@ -35,7 +47,11 @@ class GraphService:
             node_map[node_id] = party
 
         # Add Document nodes
-        documents = self.db.query(Document).all()
+        if self.user_id:
+            documents = self.db.query(Document).filter(Document.user_id == self.user_id).all()
+        else:
+            documents = self.db.query(Document).all()
+
         for doc in documents:
             node_id = f"document-{doc.id}"
             nodes.append({
@@ -50,7 +66,13 @@ class GraphService:
             node_map[node_id] = doc
 
         # Add Transaction nodes and links
-        transactions = self.db.query(Transaction).all()
+        if self.user_id:
+            transactions = self.db.query(Transaction).join(Document).filter(
+                Document.user_id == self.user_id
+            ).all()
+        else:
+            transactions = self.db.query(Transaction).all()
+
         for txn in transactions:
             node_id = f"transaction-{txn.id}"
             nodes.append({
@@ -135,8 +157,12 @@ class GraphService:
         nodes = []
         links = []
 
-        # Get the document
-        document = self.db.query(Document).filter(Document.id == document_id).first()
+        # Get the document (filtered by user if user_id is set)
+        query = self.db.query(Document).filter(Document.id == document_id)
+        if self.user_id:
+            query = query.filter(Document.user_id == self.user_id)
+
+        document = query.first()
         if not document:
             return {"nodes": [], "links": [], "stats": {}}
 
@@ -252,10 +278,12 @@ class GraphService:
             "entity_type": party.party_type or "vendor"
         })
 
-        # Add related transactions
-        transactions = self.db.query(Transaction).filter(
-            Transaction.party_id == party_id
-        ).all()
+        # Add related transactions (filtered by user if user_id is set)
+        query = self.db.query(Transaction).filter(Transaction.party_id == party_id)
+        if self.user_id:
+            query = query.join(Document).filter(Document.user_id == self.user_id)
+
+        transactions = query.all()
 
         for txn in transactions:
             txn_node_id = f"transaction-{txn.id}"

@@ -13,6 +13,7 @@ from app.services.query_service import QueryService
 from app.services.graph_service import GraphService
 from app.services.template_service import TemplateService
 from app.core.config import settings
+from app.core.auth import get_current_active_user
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -53,24 +54,24 @@ async def google_auth():
 
 
 @router.post("/auth/callback", response_model=TokenResponse)
-async def oauth_callback(request: OAuthCallbackRequest, db: Session = Depends(get_db)):
-    """Handle OAuth callback and store tokens."""
+async def oauth_callback(
+    request: OAuthCallbackRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Handle OAuth callback and store tokens for authenticated user."""
     try:
         tokens = GmailService.exchange_code_for_tokens(request.code)
 
-        # For MVP, we have a single user. Find or create user.
-        user = db.query(User).first()
-        if not user:
-            user = User(email="default@example.com")
-            db.add(user)
-
-        user.gmail_access_token = tokens["access_token"]
-        user.gmail_refresh_token = tokens["refresh_token"]
-        user.gmail_token_expiry = tokens["token_expiry"]
+        # Update current user's Gmail tokens
+        current_user.gmail_access_token = tokens["access_token"]
+        current_user.gmail_refresh_token = tokens["refresh_token"]
+        current_user.gmail_token_expiry = tokens["token_expiry"]
+        current_user.gmail_connected = True
 
         db.commit()
 
-        return {"message": "Successfully connected Gmail", "user_id": user.id}
+        return {"message": "Successfully connected Gmail", "user_id": current_user.id}
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"OAuth failed: {str(e)}")
@@ -79,17 +80,18 @@ async def oauth_callback(request: OAuthCallbackRequest, db: Session = Depends(ge
 # ========== Email Sync Routes ==========
 
 @router.post("/sync/gmail")
-async def sync_gmail(db: Session = Depends(get_db)):
-    """Sync emails from Gmail."""
-    # Get user (single user for MVP)
-    user = db.query(User).first()
-    if not user or not user.gmail_access_token:
+async def sync_gmail(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Sync emails from Gmail for the authenticated user."""
+    if not current_user.gmail_access_token:
         raise HTTPException(status_code=401, detail="Gmail not connected")
 
     try:
         # Fetch emails
         emails = GmailService.fetch_emails(
-            user.gmail_access_token,
+            current_user.gmail_access_token,
             months=settings.EMAIL_FETCH_MONTHS
         )
 
@@ -115,7 +117,7 @@ async def sync_gmail(db: Session = Depends(get_db)):
                 # TODO: Process attachments in background job
 
         db.commit()
-        user.last_sync = datetime.utcnow()
+        current_user.last_sync = datetime.utcnow()
         db.commit()
 
         return {
@@ -133,9 +135,10 @@ async def sync_gmail(db: Session = Depends(get_db)):
 @router.post("/upload/pdf", response_model=UploadResponse)
 async def upload_pdf(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    """Upload a PDF document."""
+    """Upload a PDF document for the authenticated user."""
     # Validate file type
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
@@ -163,6 +166,7 @@ async def upload_pdf(
 
         # Create document record
         document = Document(
+            user_id=current_user.id,
             filename=file.filename,
             file_path=file_path,
             file_size=file_size,
@@ -197,10 +201,12 @@ async def get_transactions(
     doc_type: Optional[str] = Query(None),
     limit: int = Query(100, le=1000),
     offset: int = Query(0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    """Get transactions with optional filters."""
-    query = db.query(Transaction)
+    """Get transactions for the authenticated user with optional filters."""
+    # Only get transactions from user's documents
+    query = db.query(Transaction).join(Document).filter(Document.user_id == current_user.id)
 
     # Apply filters
     if date_from:
@@ -261,9 +267,16 @@ async def get_transactions(
 # ========== Document Routes ==========
 
 @router.get("/documents/{document_id}")
-async def get_document(document_id: int, db: Session = Depends(get_db)):
-    """Get document details."""
-    document = db.query(Document).filter(Document.id == document_id).first()
+async def get_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get document details for the authenticated user."""
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id
+    ).first()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -284,9 +297,13 @@ async def get_document(document_id: int, db: Session = Depends(get_db)):
 # ========== Query Routes ==========
 
 @router.post("/query")
-async def query(request: QueryRequest, db: Session = Depends(get_db)):
-    """Answer predefined queries."""
-    query_service = QueryService(db)
+async def query(
+    request: QueryRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Answer predefined queries for the authenticated user."""
+    query_service = QueryService(db, user_id=current_user.id)
 
     try:
         result = query_service.answer_query(request.query_type, request.params)
@@ -296,23 +313,39 @@ async def query(request: QueryRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/filters")
-async def get_filters(db: Session = Depends(get_db)):
-    """Get available filter values."""
-    query_service = QueryService(db)
+async def get_filters(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get available filter values for the authenticated user."""
+    query_service = QueryService(db, user_id=current_user.id)
     return query_service.get_transaction_filters()
 
 
 # ========== Stats Routes ==========
 
 @router.get("/stats")
-async def get_stats(db: Session = Depends(get_db)):
-    """Get overall statistics."""
-    total_transactions = db.query(Transaction).count()
-    total_documents = db.query(Document).count()
+async def get_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get statistics for the authenticated user."""
+    # Count user's documents
+    total_documents = db.query(Document).filter(Document.user_id == current_user.id).count()
+
+    # Count user's transactions (through documents)
+    total_transactions = db.query(Transaction).join(Document).filter(
+        Document.user_id == current_user.id
+    ).count()
+
+    # Count emails (all emails for now - can be user-specific later)
     total_emails = db.query(Email).count()
 
+    # Calculate total amount from user's transactions
     from sqlalchemy import func
-    total_amount = db.query(func.sum(Transaction.amount)).scalar() or 0.0
+    total_amount = db.query(func.sum(Transaction.amount)).join(Document).filter(
+        Document.user_id == current_user.id
+    ).scalar() or 0.0
 
     return {
         "total_transactions": total_transactions,
@@ -326,23 +359,34 @@ async def get_stats(db: Session = Depends(get_db)):
 # ========== Knowledge Graph Routes ==========
 
 @router.get("/graph")
-async def get_knowledge_graph(db: Session = Depends(get_db)):
-    """Get complete knowledge graph with all entities and relationships."""
-    graph_service = GraphService(db)
+async def get_knowledge_graph(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get knowledge graph for the authenticated user."""
+    graph_service = GraphService(db, user_id=current_user.id)
     return graph_service.build_knowledge_graph()
 
 
 @router.get("/graph/document/{document_id}")
-async def get_document_graph(document_id: int, db: Session = Depends(get_db)):
+async def get_document_graph(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Get knowledge graph for a specific document."""
-    graph_service = GraphService(db)
+    graph_service = GraphService(db, user_id=current_user.id)
     return graph_service.get_document_graph(document_id)
 
 
 @router.get("/graph/party/{party_id}")
-async def get_party_graph(party_id: int, db: Session = Depends(get_db)):
+async def get_party_graph(
+    party_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Get knowledge graph for a specific party (vendor)."""
-    graph_service = GraphService(db)
+    graph_service = GraphService(db, user_id=current_user.id)
     return graph_service.get_party_graph(party_id)
 
 
