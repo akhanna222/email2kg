@@ -17,6 +17,21 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str
     GOOGLE_REDIRECT_URI: str
 
+    # Microsoft Outlook OAuth (Optional - add your credentials in .env)
+    OUTLOOK_CLIENT_ID: str = ""
+    OUTLOOK_CLIENT_SECRET: str = ""
+    OUTLOOK_REDIRECT_URI: str = ""
+
+    # IMAP Email Server (Optional - for generic email providers)
+    IMAP_SERVER: str = ""
+    IMAP_PORT: int = 993
+    IMAP_USERNAME: str = ""
+    IMAP_PASSWORD: str = ""
+    IMAP_USE_SSL: bool = True
+
+    # Email Provider Selection
+    EMAIL_PROVIDER: str = "gmail"  # Options: gmail, outlook, imap
+
     # LLM Configuration
     LLM_PROVIDER: str = "openai"  # openai or anthropic
     OPENAI_API_KEY: str = ""
@@ -28,6 +43,7 @@ class Settings(BaseSettings):
 
     # Email Sync
     EMAIL_FETCH_MONTHS: int = 3
+    EMAIL_SYNC_LIMIT: int = 500  # Max emails to fetch per sync
 
     # CORS
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
