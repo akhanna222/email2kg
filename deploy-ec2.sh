@@ -109,9 +109,29 @@ read -p "Google OAuth Client Secret: " GOOGLE_CLIENT_SECRET
 SECRET_KEY=$(openssl rand -hex 32)
 JWT_SECRET_KEY=$(openssl rand -hex 32)
 
-# Get EC2 public IP
-EC2_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-echo -e "${GREEN}EC2 Public IP: ${EC2_IP}${NC}"
+# Get EC2 public IP with fallback methods
+echo -e "${BLUE}Detecting EC2 public IP...${NC}"
+EC2_IP=$(curl -s --max-time 5 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null)
+
+# Validate IP format (basic check)
+if [[ ! $EC2_IP =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    echo -e "${YELLOW}Primary method failed, trying alternative...${NC}"
+    EC2_IP=$(curl -s --max-time 5 http://checkip.amazonaws.com 2>/dev/null)
+fi
+
+# If still no valid IP, try another service
+if [[ ! $EC2_IP =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    echo -e "${YELLOW}Trying another service...${NC}"
+    EC2_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null)
+fi
+
+# If still failed, ask user
+if [[ ! $EC2_IP =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    echo -e "${RED}Could not auto-detect EC2 public IP${NC}"
+    read -p "Please enter your EC2 public IP address: " EC2_IP
+fi
+
+echo -e "${GREEN}✓ EC2 Public IP: ${EC2_IP}${NC}"
 
 # Create .env file
 cat > .env << EOF
@@ -136,6 +156,14 @@ ALLOWED_ORIGINS=["http://${EC2_IP}","http://localhost"]
 # App Settings
 DEBUG=False
 EOF
+
+# Validate .env file doesn't contain HTML
+if grep -q "<!DOCTYPE" .env || grep -q "<html" .env; then
+    echo -e "${RED}ERROR: .env file contains HTML content!${NC}"
+    echo -e "${RED}This usually means IP detection failed.${NC}"
+    echo -e "${YELLOW}Please manually create .env file with correct values.${NC}"
+    exit 1
+fi
 
 echo -e "${GREEN}✓ Environment configured${NC}"
 
