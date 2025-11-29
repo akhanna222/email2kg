@@ -8,8 +8,9 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --legacy-peer-deps
+# Install dependencies with proper resolution
+RUN npm install --legacy-peer-deps && \
+    npm install ajv@^8.0.0 --legacy-peer-deps
 
 # Copy source code
 COPY . .
