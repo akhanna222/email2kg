@@ -15,6 +15,9 @@ RUN npm install --legacy-peer-deps && \
 # Copy source code
 COPY . .
 
+# Set API URL for production build
+ENV REACT_APP_API_URL=http://34.245.37.71:8000/api
+
 # Build the application
 RUN npm run build
 
