@@ -178,8 +178,14 @@ case $DEPLOY_METHOD in
     1)
         echo -e "${BLUE}Deploying with Docker Compose...${NC}"
 
-        # Start services
-        docker-compose up --build -d
+        # Check if user can run docker without sudo
+        if ! docker ps &>/dev/null; then
+            echo -e "${YELLOW}Docker requires elevated permissions...${NC}"
+            echo -e "${YELLOW}Using sudo for Docker commands${NC}"
+            sudo docker-compose up --build -d
+        else
+            docker-compose up --build -d
+        fi
 
         echo ""
         echo -e "${GREEN}========================================${NC}"
@@ -196,6 +202,13 @@ case $DEPLOY_METHOD in
         echo "  Restart: docker-compose restart"
         echo "  Stop: docker-compose down"
         echo "  View status: docker-compose ps"
+        echo ""
+        if ! docker ps &>/dev/null; then
+            echo -e "${YELLOW}Note: To use docker without sudo in future sessions:${NC}"
+            echo "  1. Log out: exit"
+            echo "  2. SSH back in"
+            echo "  Or run: newgrp docker"
+        fi
         ;;
 
     2)
