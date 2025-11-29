@@ -31,9 +31,9 @@ sudo apt update && sudo apt upgrade -y
 # Step 2: Install dependencies
 echo -e "${BLUE}Step 2: Installing dependencies...${NC}"
 sudo apt install -y \
-    python3.10 \
+    python3 \
     python3-pip \
-    python3.10-venv \
+    python3-venv \
     nodejs \
     npm \
     postgresql \
