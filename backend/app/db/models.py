@@ -85,7 +85,7 @@ class Party(Base):
 
     # Additional info
     email = Column(String, nullable=True)
-    metadata = Column(JSON)  # Store additional party information
+    party_metadata = Column(JSON)  # Store additional party information
 
     created_at = Column(DateTime, default=datetime.utcnow)
 

@@ -42,7 +42,7 @@ class GraphService:
                 "name": party.name,
                 "type": "party",
                 "entity_type": party.party_type or "vendor",
-                "metadata": party.metadata or {}
+                "metadata": party.party_metadata or {}
             })
             node_map[node_id] = party
 
