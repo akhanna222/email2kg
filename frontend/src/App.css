@@ -98,6 +98,27 @@ body {
   transform: translateY(-2px);
 }
 
+.nav-logout {
+  color: var(--text-primary);
+  background: transparent;
+  border: 1.5px solid var(--border-color);
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.nav-logout:hover {
+  background: var(--danger-color);
+  border-color: var(--danger-color);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
 /* Container */
 .container {
   max-width: 1400px;
