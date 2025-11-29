@@ -32,7 +32,7 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 10080
-      ALLOWED_ORIGINS: '["http://localhost","http://localhost:3000"]'
+      ALLOWED_ORIGINS: '["http://localhost","http://localhost:3000","http://34.245.37.71:3000","http://34.245.37.71:8000"]'
       UPLOAD_DIR: /app/uploads
       # Optional OAuth providers
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
