@@ -37,6 +37,22 @@ class Settings(BaseSettings):
     # Email Provider Selection
     EMAIL_PROVIDER: str = "gmail"  # Options: gmail, outlook, imap
 
+    # SMTP Configuration (for IMAP provider)
+    SMTP_SERVER: str = ""
+    SMTP_PORT: int = 587
+
+    # WhatsApp Business API (Optional)
+    WHATSAPP_PHONE_NUMBER_ID: str = ""
+    WHATSAPP_BUSINESS_ACCOUNT_ID: str = ""
+    WHATSAPP_APP_ID: str = ""
+    WHATSAPP_APP_SECRET: str = ""
+    WHATSAPP_VERIFY_TOKEN: str = ""
+
+    # Telegram Bot API (Optional)
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_BOT_USERNAME: str = ""
+    TELEGRAM_WEBHOOK_URL: str = ""
+
     # LLM Configuration
     LLM_PROVIDER: str = "openai"  # openai or anthropic
     OPENAI_API_KEY: str = ""
