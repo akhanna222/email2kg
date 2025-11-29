@@ -133,7 +133,7 @@ class ProcessingService:
                     transaction_date=self._parse_date(structured_data.get('date')),
                     transaction_type=doc_type,
                     description=f"{doc_type.title()} from {party_name}" if party_name else doc_type.title(),
-                    metadata=structured_data
+                    transaction_metadata=structured_data
                 )
                 self.db.add(transaction)
 

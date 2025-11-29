@@ -110,7 +110,7 @@ class Transaction(Base):
 
     # Additional details
     description = Column(Text, nullable=True)
-    metadata = Column(JSON)  # Store additional transaction information
+    transaction_metadata = Column(JSON)  # Store additional transaction information
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
