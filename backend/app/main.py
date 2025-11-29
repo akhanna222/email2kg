@@ -17,6 +17,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from app.api.routes import router
 from app.api.auth_routes import router as auth_router
 from app.api.feedback_routes import router as feedback_router
@@ -50,13 +52,20 @@ async def lifespan(app: FastAPI):
 
     try:
         # Create database tables
-        Base.metadata.create_all(bind=engine)
-        logger.info("Database tables created successfully")
+        try:
+            Base.metadata.create_all(bind=engine)
+            logger.info("Database tables created successfully")
+        except IntegrityError as e:
+            # Handle case where PostgreSQL ENUM types already exist
+            if "duplicate key value violates unique constraint" in str(e) and "processingstatus" in str(e).lower():
+                logger.info("Database types already exist, skipping creation")
+            else:
+                raise
 
         # Verify database connection
         db = SessionLocal()
         try:
-            db.execute("SELECT 1")
+            db.execute(text("SELECT 1"))
             logger.info("Database connection verified")
         finally:
             db.close()
