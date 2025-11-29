@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getStats } from '../services/api';
 import { Stats } from '../types';
+import GmailStatusWidget from './GmailStatusWidget';
 
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -33,6 +34,9 @@ const Dashboard: React.FC = () => {
   return (
     <div className="dashboard">
       <h1>Dashboard</h1>
+
+      {/* Gmail Connection Status */}
+      <GmailStatusWidget />
 
       <div className="stats-grid">
         <div className="stat-card">
