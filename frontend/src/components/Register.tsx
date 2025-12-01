@@ -27,9 +27,14 @@ const Register: React.FC = () => {
       return;
     }
 
-    // Validate password length
+    // Validate password length (bcrypt has a 72 character limit)
     if (password.length < 8) {
       setError('Password must be at least 8 characters long');
+      return;
+    }
+
+    if (password.length > 72) {
+      setError('Password must be 72 characters or less');
       return;
     }
 
@@ -94,10 +99,11 @@ const Register: React.FC = () => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
+              placeholder="8-72 characters"
               required
               autoComplete="new-password"
               minLength={8}
+              maxLength={72}
               disabled={loading}
             />
           </div>
@@ -113,6 +119,7 @@ const Register: React.FC = () => {
               required
               autoComplete="new-password"
               minLength={8}
+              maxLength={72}
               disabled={loading}
             />
           </div>
