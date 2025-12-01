@@ -32,12 +32,12 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 10080
-      ALLOWED_ORIGINS: '["http://localhost","http://localhost:3000","http://34.245.37.71:3000","http://34.245.37.71:8000"]'
+      ALLOWED_ORIGINS: '["http://localhost","http://localhost:3000","http://agenticrag360.com:3000","http://agenticrag360.com:8000","http://34.245.37.71:3000","http://34.245.37.71:8000"]'
       UPLOAD_DIR: /app/uploads
       # Optional OAuth providers
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/auth/google/callback}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://agenticrag360.com:8000/api/auth/google/callback}
       # Optional messaging platforms
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
       WHATSAPP_APP_ID: ${WHATSAPP_APP_ID:-}
