@@ -2,7 +2,7 @@
  * Authentication service for managing user login, registration, and JWT tokens.
  */
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 export interface User {
   id: number;
@@ -40,7 +40,7 @@ class AuthService {
    * Register a new user
    */
   async register(data: RegisterData): Promise<User> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -60,7 +60,7 @@ class AuthService {
    * Login user and store JWT token
    */
   async login(credentials: LoginCredentials): Promise<User> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -100,7 +100,7 @@ class AuthService {
       throw new Error('No authentication token');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+    const response = await fetch(`${API_BASE_URL}/auth/me`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -127,7 +127,7 @@ class AuthService {
       throw new Error('No authentication token');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+    const response = await fetch(`${API_BASE_URL}/auth/me`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -155,7 +155,7 @@ class AuthService {
       throw new Error('No authentication token');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+    const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
