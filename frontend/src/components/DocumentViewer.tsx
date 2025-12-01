@@ -4,6 +4,8 @@ import { getDocument } from '../services/api';
 import { Document } from '../types';
 import { format } from 'date-fns';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:8000';
+
 const DocumentViewer: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [document, setDocument] = useState<Document | null>(null);
@@ -129,7 +131,7 @@ const DocumentViewer: React.FC = () => {
 
       <div className="actions">
         <a
-          href={`http://localhost:8000${document.file_path.replace('.', '')}`}
+          href={`${API_BASE_URL}${document.file_path.replace('.', '')}`}
           target="_blank"
           rel="noopener noreferrer"
           className="button"
