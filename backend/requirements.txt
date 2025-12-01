@@ -17,6 +17,7 @@ google-auth-httplib2==0.1.1
 google-api-python-client==2.108.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.1.2  # Explicit modern bcrypt version to handle 72-byte limit properly
 
 # PDF Processing & Vision OCR
 PyPDF2==3.0.1
