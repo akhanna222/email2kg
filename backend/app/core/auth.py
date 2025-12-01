@@ -37,9 +37,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         True if password matches, False otherwise
     """
-    # Truncate to 72 bytes to match behavior in get_password_hash
-    password_bytes = plain_password.encode('utf-8')[:72]
-    password_truncated = password_bytes.decode('utf-8', errors='ignore')
+    # Truncate to ensure ≤ 72 bytes when UTF-8 encoded
+    # Truncate character by character to avoid cutting multi-byte UTF-8 sequences
+    password_truncated = plain_password
+    while len(password_truncated.encode('utf-8')) > 72:
+        password_truncated = password_truncated[:-1]
     return pwd_context.verify(password_truncated, hashed_password)
 
 
@@ -55,11 +57,12 @@ def get_password_hash(password: str) -> str:
     Returns:
         Hashed password
     """
-    # Truncate password to 72 bytes to comply with bcrypt limitation
-    # This is safe because we're consistently truncating both during
-    # hashing and verification
-    password_bytes = password.encode('utf-8')[:72]
-    password_truncated = password_bytes.decode('utf-8', errors='ignore')
+    # Truncate password to ensure it's ≤ 72 bytes when UTF-8 encoded
+    # Truncate character by character to avoid cutting multi-byte UTF-8 sequences
+    password_truncated = password
+    while len(password_truncated.encode('utf-8')) > 72:
+        password_truncated = password_truncated[:-1]
+
     return pwd_context.hash(password_truncated)
 
 
