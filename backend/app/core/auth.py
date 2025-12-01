@@ -13,7 +13,9 @@ from app.db.models import User
 from app.core.config import settings
 
 # Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Using bcrypt_sha256 instead of bcrypt to avoid the 72-byte password limit
+# bcrypt_sha256 hashes the password with SHA256 first, then uses bcrypt on the hash
+pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
 
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -28,8 +30,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Verify a plain password against a hashed password.
 
-    Truncates to 72 bytes to match hashing behavior.
-
     Args:
         plain_password: The plain text password
         hashed_password: The hashed password from database
@@ -37,19 +37,15 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         True if password matches, False otherwise
     """
-    # Truncate to ensure ≤ 72 bytes when UTF-8 encoded
-    # Truncate character by character to avoid cutting multi-byte UTF-8 sequences
-    password_truncated = plain_password
-    while len(password_truncated.encode('utf-8')) > 72:
-        password_truncated = password_truncated[:-1]
-    return pwd_context.verify(password_truncated, hashed_password)
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
     """
-    Hash a password using bcrypt.
+    Hash a password using bcrypt_sha256.
 
-    Bcrypt has a 72-byte limit, so we truncate if necessary.
+    bcrypt_sha256 hashes the password with SHA256 first, then applies bcrypt,
+    which avoids the 72-byte password limit and provides additional security.
 
     Args:
         password: Plain text password
@@ -57,13 +53,7 @@ def get_password_hash(password: str) -> str:
     Returns:
         Hashed password
     """
-    # Truncate password to ensure it's ≤ 72 bytes when UTF-8 encoded
-    # Truncate character by character to avoid cutting multi-byte UTF-8 sequences
-    password_truncated = password
-    while len(password_truncated.encode('utf-8')) > 72:
-        password_truncated = password_truncated[:-1]
-
-    return pwd_context.hash(password_truncated)
+    return pwd_context.hash(password)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
