@@ -480,6 +480,74 @@ psql -U email2kg_user -d email2kg -h localhost
 2. Check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env
 3. Ensure port 8000 is accessible from internet
 
+### "Failed to fetch" error on registration
+
+**Issue:** Frontend can't connect to backend API, browser shows CORS errors or "Failed to fetch".
+
+**Cause:** Frontend is trying to call `localhost:8000` instead of the EC2 IP address.
+
+**Solution:**
+```bash
+# 1. Verify frontend was rebuilt with correct API URL
+sudo docker exec email2kg-frontend cat /usr/share/nginx/html/static/js/main.*.js | grep -o 'http://[^"]*:8000' | head -1
+# Should show: http://YOUR_EC2_IP:8000/api
+
+# 2. If it shows localhost, rebuild frontend:
+cd ~/email2kg
+git pull
+sudo docker-compose up --build -d frontend
+
+# 3. Hard refresh browser (Ctrl+Shift+R or Cmd+Shift+R)
+```
+
+### SQLAlchemy "metadata" reserved keyword error
+
+**Issue:** Backend crashes with:
+```
+sqlalchemy.exc.InvalidRequestError: Attribute name 'metadata' is reserved
+```
+
+**Cause:** Older versions of the code used `metadata` as a column name, which conflicts with SQLAlchemy.
+
+**Solution:**
+```bash
+# Pull latest code with fixed field names (party_metadata, transaction_metadata)
+cd ~/email2kg
+git pull
+sudo docker-compose up --build -d backend
+```
+
+### PostgreSQL ENUM type already exists error
+
+**Issue:** Backend startup shows:
+```
+duplicate key value violates unique constraint "pg_type_typname_nsp_index"
+Key (typname, typnamespace)=(processingstatus, 2200) already exists
+```
+
+**Cause:** PostgreSQL ENUM types persist from previous deployments.
+
+**Solution:** Latest code handles this gracefully. Update to latest version:
+```bash
+cd ~/email2kg
+git pull
+sudo docker-compose up --build -d backend
+```
+
+### 404 error with double /api/api/ in URL
+
+**Issue:** Browser console shows requests to `/api/api/auth/register` (double /api).
+
+**Cause:** Mismatch between REACT_APP_API_URL configuration and code expectations.
+
+**Solution:** Latest code is fixed. Update and rebuild:
+```bash
+cd ~/email2kg
+git pull
+sudo docker-compose up --build -d
+# Hard refresh browser after rebuild
+```
+
 ---
 
 ## 🔄 Updating the Application

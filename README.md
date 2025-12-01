@@ -401,7 +401,11 @@ npm test
 
 ## 🚢 Deployment
 
-### Docker Deployment
+Email2KG supports multiple deployment options for different use cases.
+
+### Local Docker Deployment
+
+Perfect for development and testing:
 
 ```bash
 # Build and start all services
@@ -414,16 +418,77 @@ docker-compose logs -f
 docker-compose down
 ```
 
+### AWS EC2 Deployment (Production)
+
+Deploy to AWS EC2 with automated setup script:
+
+```bash
+# 1. Launch EC2 instance (t2.medium or larger, Ubuntu 22.04+)
+# 2. Configure security groups (ports 22, 80, 443, 3000, 8000)
+# 3. SSH into instance and run:
+
+git clone https://github.com/yourusername/email2kg.git
+cd email2kg
+chmod +x deploy-ec2.sh
+./deploy-ec2.sh
+```
+
+**📖 Complete Guide:** See [DEPLOY_EC2_GUIDE.md](./DEPLOY_EC2_GUIDE.md) for detailed instructions.
+
+**Key Features:**
+- ✅ Automated setup script included
+- ✅ Docker Compose orchestration
+- ✅ Systemd service auto-start
+- ✅ Nginx reverse proxy (optional)
+- ✅ Cost: ~$30-50/month
+
+### AWS ECS/Fargate Deployment (Scalable)
+
+For high-traffic production deployments:
+
+**📖 Complete Guide:** See [AWS_DEPLOYMENT.md](./AWS_DEPLOYMENT.md) for detailed instructions.
+
+**Key Features:**
+- ✅ Auto-scaling
+- ✅ Load balancing
+- ✅ High availability
+- ✅ Managed infrastructure
+- ✅ Cost: ~$100-200/month
+
 ### Production Checklist
 
+Before going live:
+
 - [ ] Set strong `SECRET_KEY` and `JWT_SECRET_KEY`
-- [ ] Configure production database
-- [ ] Enable HTTPS (SSL/TLS)
+- [ ] Configure production database (RDS or managed PostgreSQL)
+- [ ] Enable HTTPS (SSL/TLS) with Let's Encrypt or AWS Certificate Manager
 - [ ] Set up rate limiting
-- [ ] Configure CORS properly
-- [ ] Enable database backups
-- [ ] Set up monitoring (Prometheus/Grafana)
-- [ ] Configure log aggregation
+- [ ] Configure CORS with specific allowed origins
+- [ ] Enable database backups (automated snapshots)
+- [ ] Set up monitoring (CloudWatch, Prometheus, or Datadog)
+- [ ] Configure log aggregation (CloudWatch Logs or ELK)
+- [ ] Set up alerts for errors and performance issues
+- [ ] Configure environment-specific REACT_APP_API_URL for frontend
+- [ ] Test OAuth callback URLs match deployment domain
+
+### Troubleshooting
+
+**Common deployment issues:**
+
+1. **"Failed to fetch" errors:** Frontend not configured with correct API URL
+   - Solution: Rebuild frontend with proper REACT_APP_API_URL environment variable
+   - See [DEPLOY_EC2_GUIDE.md#troubleshooting](./DEPLOY_EC2_GUIDE.md#-troubleshooting)
+
+2. **SQLAlchemy metadata errors:** Fixed in latest version
+   - Solution: `git pull && docker-compose up --build -d`
+
+3. **CORS errors:** Allowed origins not configured
+   - Solution: Add your domain to ALLOWED_ORIGINS in docker-compose.yml
+
+4. **Database connection errors:** Check DATABASE_URL format
+   - Format: `postgresql://user:password@host:port/dbname`
+
+**📖 Full Troubleshooting Guide:** See [DEPLOY_EC2_GUIDE.md#troubleshooting](./DEPLOY_EC2_GUIDE.md#-troubleshooting)
 
 ---
 
