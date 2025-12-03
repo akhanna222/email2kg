@@ -39,9 +39,12 @@ echo "✅ Switched to HTTP-only configuration"
 echo ""
 
 echo "📋 Step 2: Removing SSL volume mount temporarily"
-# Comment out SSL volume in docker-compose.yml temporarily
+# Remove SSL volume line from docker-compose.yml temporarily
 if grep -q "./ssl:/etc/nginx/ssl:ro" docker-compose.yml; then
-    sed -i.bak 's|      - ./ssl:/etc/nginx/ssl:ro|      # - ./ssl:/etc/nginx/ssl:ro  # Temporarily disabled for Let'\''s Encrypt|' docker-compose.yml
+    cp docker-compose.yml docker-compose.yml.bak
+    sed -i '/\.\/ssl:\/etc\/nginx\/ssl:ro/d' docker-compose.yml
+    # Also remove the volumes: line if it's now empty
+    sed -i '/volumes:$/N;s/volumes:\n    depends_on:/depends_on:/' docker-compose.yml
     echo "✅ Disabled SSL volume mount"
 fi
 echo ""
