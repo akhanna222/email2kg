@@ -16,7 +16,8 @@ RUN npm install --legacy-peer-deps && \
 COPY . .
 
 # Set API URL for production build
-ENV REACT_APP_API_URL=http://agenticrag360.com:8000/api
+# Using HTTPS without port for cleaner URLs (nginx will proxy to backend:8000)
+ENV REACT_APP_API_URL=https://agenticrag360.com/api
 
 # Build the application
 RUN npm run build
