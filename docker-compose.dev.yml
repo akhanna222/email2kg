@@ -1,0 +1,137 @@
+# Development Docker Compose Configuration
+# For local development with hot reload and debugging enabled
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: email2kg-dev-db
+    environment:
+      POSTGRES_DB: email2kg_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"  # Exposed for local database tools
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - email2kg-dev-network
+    restart: unless-stopped
+
+  # Neo4j Graph Database (optional for development)
+  # Uncomment if you need the full graph database in development
+  # neo4j:
+  #   image: neo4j:5.13-community
+  #   container_name: email2kg-dev-neo4j
+  #   environment:
+  #     NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-password}
+  #   ports:
+  #     - "7474:7474"  # HTTP
+  #     - "7687:7687"  # Bolt
+  #   volumes:
+  #     - neo4j_dev_data:/data
+  #   networks:
+  #     - email2kg-dev-network
+  #   restart: unless-stopped
+
+  # Redis Cache (optional for development)
+  # Uncomment if you need caching in development
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: email2kg-dev-redis
+  #   ports:
+  #     - "6379:6379"
+  #   networks:
+  #     - email2kg-dev-network
+  #   restart: unless-stopped
+
+  # Backend API (Development mode with hot reload)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: email2kg-dev-backend
+    environment:
+      # Database
+      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@postgres:5432/email2kg_dev
+
+      # API Keys
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+
+      # Security (use weak keys for dev)
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-not-for-production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-jwt-secret-not-for-production}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 10080  # 7 days for dev convenience
+
+      # Development settings
+      DEBUG: "True"
+      ENVIRONMENT: development
+      ALLOWED_ORIGINS: '["http://localhost","http://localhost:3000","http://localhost:8000","http://127.0.0.1:3000"]'
+
+      # OAuth (optional)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/auth/google/callback}
+
+      # File storage
+      UPLOAD_DIR: /app/uploads
+
+    volumes:
+      # Mount source code for hot reload
+      - ./backend:/app
+      - ./backend/uploads:/app/uploads
+
+    ports:
+      - "8000:8000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    # Development: use uvicorn with reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+    networks:
+      - email2kg-dev-network
+
+    restart: unless-stopped
+
+  # Frontend (Development mode with hot reload)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development  # Use development stage if multi-stage build
+    container_name: email2kg-dev-frontend
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api
+      - NODE_ENV=development
+    volumes:
+      # Mount source code for hot reload
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    command: npm start
+    networks:
+      - email2kg-dev-network
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  # neo4j_dev_data:
+  #   driver: local
+
+networks:
+  email2kg-dev-network:
+    driver: bridge
