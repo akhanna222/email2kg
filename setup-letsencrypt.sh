@@ -38,20 +38,13 @@ cp frontend/nginx-http-only.conf frontend/nginx.conf
 echo "✅ Switched to HTTP-only configuration"
 echo ""
 
-echo "📋 Step 2: Removing SSL volume mount temporarily"
-# Remove SSL volume line from docker-compose.yml temporarily
-if grep -q "./ssl:/etc/nginx/ssl:ro" docker-compose.yml; then
-    cp docker-compose.yml docker-compose.yml.bak
-    sed -i '/\.\/ssl:\/etc\/nginx\/ssl:ro/d' docker-compose.yml
-    # Also remove the volumes: line if it's now empty
-    sed -i '/volumes:$/N;s/volumes:\n    depends_on:/depends_on:/' docker-compose.yml
-    echo "✅ Disabled SSL volume mount"
-fi
+echo "📋 Step 2: Using HTTP-only docker-compose configuration"
+echo "✅ Will use docker-compose.http-only.yml (no SSL volumes)"
 echo ""
 
 echo "📋 Step 3: Restarting containers with HTTP-only"
 $SUDO docker-compose down
-$SUDO docker-compose up --build -d
+$SUDO docker-compose -f docker-compose.http-only.yml up --build -d
 echo "⏳ Waiting for services to start..."
 sleep 15
 echo "✅ Services started"
@@ -125,15 +118,9 @@ if [ -f "frontend/nginx.conf.backup" ]; then
     mv frontend/nginx.conf.backup frontend/nginx.conf
     echo "✅ Restored HTTPS nginx config"
 fi
-
-# Restore SSL volume mount
-if [ -f "docker-compose.yml.bak" ]; then
-    mv docker-compose.yml.bak docker-compose.yml
-    echo "✅ Restored docker-compose.yml"
-fi
 echo ""
 
-echo "📋 Step 9: Deploying with HTTPS"
+echo "📋 Step 9: Deploying with HTTPS using regular docker-compose.yml"
 $SUDO docker-compose down
 $SUDO docker-compose up --build -d
 echo "⏳ Waiting for services to start..."
