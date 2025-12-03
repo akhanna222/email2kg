@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 import TransactionList from './components/TransactionList';
 import DocumentViewer from './components/DocumentViewer';
@@ -47,7 +48,7 @@ const Navbar: React.FC = () => {
       </div>
       <ul className="nav-links">
         <li>
-          <Link to="/">Dashboard</Link>
+          <Link to="/dashboard">Dashboard</Link>
         </li>
         <li>
           <Link to="/transactions">Transactions</Link>
@@ -79,6 +80,24 @@ const Navbar: React.FC = () => {
 };
 
 /**
+ * Home Route - Shows Landing Page if not authenticated, Dashboard if authenticated
+ */
+const HomeRoute: React.FC = () => {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="loading">
+        <div className="spinner"></div>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />;
+};
+
+/**
  * App content with routing
  */
 const AppContent: React.FC = () => {
@@ -88,12 +107,13 @@ const AppContent: React.FC = () => {
       <div className="container">
         <Routes>
           {/* Public routes */}
+          <Route path="/" element={<HomeRoute />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
           {/* Protected routes */}
           <Route
-            path="/"
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <Dashboard />
