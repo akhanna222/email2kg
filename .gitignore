@@ -69,6 +69,14 @@ out/
 credentials.json
 token.json
 
+# SSL Certificates (never commit these!)
+ssl/
+*.crt
+*.key
+*.pem
+*.p12
+*.pfx
+
 # Temporary files
 tmp/
 temp/
