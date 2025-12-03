@@ -56,8 +56,10 @@ $SUDO apt-get install -y certbot python3-certbot-nginx
 echo "✅ Certbot installed"
 echo ""
 
-echo "📋 Step 5: Stopping nginx to free port 80"
+echo "📋 Step 5: Stopping services to free port 80"
 $SUDO systemctl stop nginx 2>/dev/null || true
+$SUDO docker-compose -f docker-compose.http-only.yml down
+echo "✅ Port 80 is now free"
 echo ""
 
 echo "=================================================="
