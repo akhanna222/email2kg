@@ -412,8 +412,13 @@ openssl rand -hex 32
 2. Create a new project
 3. Enable Gmail API
 4. Create OAuth 2.0 credentials
-5. Add authorized redirect URI: `http://localhost:8000/api/auth/google/callback`
+5. Add authorized redirect URI:
+   - **Development:** `http://localhost:8000/api/auth/google/callback`
+   - **Production:** `https://yourdomain.com/api/auth/google/callback`
 6. Copy Client ID and Secret to `.env`
+7. Update `GOOGLE_REDIRECT_URI` in `.env` to match your environment
+
+**Note:** Google OAuth requires HTTPS for production (IP addresses not allowed). Use a domain name with SSL certificate.
 </details>
 
 <details>
@@ -649,23 +654,57 @@ Deploy to AWS EC2 with automated setup script:
 
 ```bash
 # 1. Launch EC2 instance (t2.medium or larger, Ubuntu 22.04+)
-# 2. Configure security groups (ports 22, 80, 443, 3000, 8000)
-# 3. SSH into instance and run:
+# 2. Configure security groups (ports 22, 80, 443)
+# 3. Point your domain to EC2 IP address
+# 4. SSH into instance and run:
 
 git clone https://github.com/yourusername/email2kg.git
 cd email2kg
 chmod +x deploy-ec2.sh
 ./deploy-ec2.sh
+
+# 5. Set up HTTPS with Let's Encrypt (automated)
+./setup-letsencrypt.sh
 ```
 
-**📖 Complete Guide:** See [DEPLOY_EC2_GUIDE.md](./DEPLOY_EC2_GUIDE.md) for detailed instructions.
+**📖 Complete Guides:**
+- [DEPLOY_EC2_GUIDE.md](./DEPLOY_EC2_GUIDE.md) - Full deployment instructions
+- [HTTPS_DEPLOYMENT.md](./HTTPS_DEPLOYMENT.md) - SSL certificate setup
 
 **Key Features:**
 - ✅ Automated setup script included
 - ✅ Docker Compose orchestration
+- ✅ Free SSL certificates (Let's Encrypt)
+- ✅ Automatic certificate renewal
+- ✅ HTTP to HTTPS redirect
 - ✅ Systemd service auto-start
-- ✅ Nginx reverse proxy (optional)
 - ✅ Cost: ~$30-50/month
+
+### HTTPS Setup with Let's Encrypt (Recommended)
+
+Secure your production deployment with free SSL certificates:
+
+```bash
+# After deploying to EC2 with a domain pointed to your server
+cd ~/email2kg
+./setup-letsencrypt.sh
+```
+
+**What it does:**
+1. ✅ Obtains free SSL certificate from Let's Encrypt
+2. ✅ Configures nginx for HTTPS (port 443)
+3. ✅ Sets up automatic HTTP→HTTPS redirect
+4. ✅ Configures auto-renewal (every 90 days)
+5. ✅ Proxies API requests through nginx (clean URLs)
+
+**Requirements:**
+- Domain name pointing to your EC2 IP
+- Ports 80 and 443 open in security group
+- 5 minutes of setup time
+
+**Result:** Your app accessible at `https://yourdomain.com` with automatic SSL renewal!
+
+**📖 Detailed Guide:** See [HTTPS_DEPLOYMENT.md](./HTTPS_DEPLOYMENT.md) for manual setup or troubleshooting.
 
 ### AWS ECS/Fargate Deployment (Scalable)
 
@@ -684,17 +723,33 @@ For high-traffic production deployments:
 
 Before going live:
 
-- [ ] Set strong `SECRET_KEY` and `JWT_SECRET_KEY`
+**Security:**
+- [ ] Set strong `SECRET_KEY` and `JWT_SECRET_KEY` (use `openssl rand -hex 32`)
 - [ ] Configure production database (RDS or managed PostgreSQL)
-- [ ] Enable HTTPS (SSL/TLS) with Let's Encrypt or AWS Certificate Manager
+- [ ] Enable HTTPS with Let's Encrypt (run `./setup-letsencrypt.sh`)
+- [ ] Verify SSL certificate auto-renewal is configured
 - [ ] Set up rate limiting
-- [ ] Configure CORS with specific allowed origins
+- [ ] Configure CORS with specific allowed origins (update `ALLOWED_ORIGINS` in `.env`)
+
+**OAuth & Domain Configuration:**
+- [ ] Point domain to server IP address (A record in DNS)
+- [ ] Update Google OAuth redirect URI to `https://yourdomain.com/api/auth/google/callback`
+- [ ] Update `GOOGLE_REDIRECT_URI` in `.env` with HTTPS domain
+- [ ] Test OAuth login flow with production domain
+
+**Infrastructure:**
+- [ ] Configure environment-specific `REACT_APP_API_URL` for frontend
 - [ ] Enable database backups (automated snapshots)
 - [ ] Set up monitoring (CloudWatch, Prometheus, or Datadog)
 - [ ] Configure log aggregation (CloudWatch Logs or ELK)
 - [ ] Set up alerts for errors and performance issues
-- [ ] Configure environment-specific REACT_APP_API_URL for frontend
-- [ ] Test OAuth callback URLs match deployment domain
+
+**Testing:**
+- [ ] Test HTTPS access (verify padlock icon in browser)
+- [ ] Test HTTP to HTTPS redirect
+- [ ] Verify all API endpoints work over HTTPS
+- [ ] Test file uploads and downloads
+- [ ] Verify OAuth providers (Gmail, Outlook) work in production
 
 ### Troubleshooting
 
