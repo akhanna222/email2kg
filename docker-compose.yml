@@ -37,6 +37,29 @@ services:
         reservations:
           memory: 256M
 
+  # Redis - Message Broker for Celery
+  redis:
+    image: redis:7-alpine
+    container_name: email2kg-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - email2kg-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # APPLICATION SERVICES
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -50,6 +73,10 @@ services:
     environment:
       # Database Configuration
       DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@postgres:5432/email2kg
+
+      # Redis/Celery Configuration
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
 
       # AI Services
       OPENAI_API_KEY: ${OPENAI_API_KEY}
@@ -91,6 +118,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -98,6 +127,58 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+    networks:
+      - email2kg-network
+
+    restart: unless-stopped
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # Celery Worker - Background Task Processing
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: email2kg-celery-worker
+    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=4 --queues=attachments,documents,default --max-tasks-per-child=1000
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@postgres:5432/email2kg
+
+      # Redis/Celery Configuration
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+
+      # AI Services
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+
+      # Security
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+
+      # File Storage
+      UPLOAD_DIR: /app/uploads
+
+      # OAuth Providers
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+
+    volumes:
+      - ./backend/uploads:/app/uploads
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
     networks:
       - email2kg-network
@@ -148,6 +229,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

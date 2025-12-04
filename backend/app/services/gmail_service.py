@@ -158,26 +158,77 @@ class GmailService:
 
     @staticmethod
     def _get_email_body(payload: Dict) -> str:
-        """Extract plain text body from email payload."""
-        body = ""
+        """
+        Extract email body from payload.
+        Tries to get plain text first, falls back to HTML converted to text.
+        """
+        plain_body = ""
+        html_body = ""
 
-        if 'parts' in payload:
-            for part in payload['parts']:
-                if part['mimeType'] == 'text/plain':
-                    if 'data' in part['body']:
-                        body = base64.urlsafe_b64decode(
-                            part['body']['data']
-                        ).decode('utf-8')
-                        break
-                elif part['mimeType'] == 'multipart/alternative':
-                    body = GmailService._get_email_body(part)
+        def extract_body_parts(part: Dict):
+            """Recursively extract text and HTML parts."""
+            nonlocal plain_body, html_body
+
+            if 'parts' in part:
+                for subpart in part['parts']:
+                    extract_body_parts(subpart)
+            else:
+                mime_type = part.get('mimeType', '')
+                body_data = part.get('body', {}).get('data')
+
+                if body_data:
+                    try:
+                        decoded = base64.urlsafe_b64decode(body_data).decode('utf-8', errors='ignore')
+
+                        if mime_type == 'text/plain' and not plain_body:
+                            plain_body = decoded
+                        elif mime_type == 'text/html' and not html_body:
+                            html_body = decoded
+                    except Exception as e:
+                        print(f"Error decoding body part: {e}")
+
+        # Extract all body parts
+        extract_body_parts(payload)
+
+        # Prefer plain text, fall back to HTML (converted to text)
+        if plain_body:
+            return plain_body
+        elif html_body:
+            # Convert HTML to plain text (basic conversion)
+            return GmailService._html_to_text(html_body)
         else:
-            if 'body' in payload and 'data' in payload['body']:
-                body = base64.urlsafe_b64decode(
-                    payload['body']['data']
-                ).decode('utf-8')
+            return ""
 
-        return body
+    @staticmethod
+    def _html_to_text(html: str) -> str:
+        """
+        Convert HTML to plain text.
+        Removes HTML tags and decodes entities.
+        """
+        import re
+        from html import unescape
+
+        # Remove script and style elements
+        html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
+        html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL | re.IGNORECASE)
+
+        # Replace <br> and <p> with newlines
+        html = re.sub(r'<br\s*/?>', '\n', html, flags=re.IGNORECASE)
+        html = re.sub(r'</p>', '\n\n', html, flags=re.IGNORECASE)
+        html = re.sub(r'<p[^>]*>', '\n', html, flags=re.IGNORECASE)
+
+        # Remove all HTML tags
+        text = re.sub(r'<[^>]+>', '', html)
+
+        # Decode HTML entities
+        text = unescape(text)
+
+        # Clean up whitespace
+        text = re.sub(r'\n\s*\n', '\n\n', text)  # Multiple newlines to double newline
+        text = re.sub(r' +', ' ', text)  # Multiple spaces to single space
+        text = text.strip()
+
+        return text
 
     @staticmethod
     def _get_attachments_info(payload: Dict) -> List[Dict]:

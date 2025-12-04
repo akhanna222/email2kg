@@ -40,6 +40,52 @@ class VisionOCRService:
         self.model = "gpt-4-vision-preview"
         self.max_tokens = 4096
 
+    def extract_text_from_image_file(
+        self,
+        image_path: str,
+        extract_structure: bool = True,
+        detail_level: str = "high"
+    ) -> Dict[str, Any]:
+        """
+        Extract text from image file (JPG, PNG, TIFF, etc.) using Vision API.
+
+        Args:
+            image_path: Path to image file
+            extract_structure: Extract structured data (tables, sections)
+            detail_level: "low", "high", or "auto"
+
+        Returns:
+            Dictionary with extracted text and metadata
+        """
+        try:
+            # Load image
+            image = Image.open(image_path)
+
+            # Extract from image
+            result = self._extract_from_image(
+                image,
+                extract_structure=extract_structure,
+                detail_level=detail_level
+            )
+
+            return {
+                'text': result['text'],
+                'method': 'openai_vision',
+                'confidence': result.get('confidence', 0.98),
+                'pages': 1,
+                'structured_data': result.get('structured_data'),
+                'model': self.model
+            }
+
+        except Exception as e:
+            logger.error(f"Vision OCR failed on image: {e}")
+            return {
+                'text': '',
+                'method': 'failed',
+                'confidence': 0.0,
+                'error': str(e)
+            }
+
     def extract_text_from_pdf(
         self,
         pdf_path: str,
