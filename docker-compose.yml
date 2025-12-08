@@ -91,16 +91,18 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-production}
 
       # CORS Configuration (Update with your domain)
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-["https://agenticrag360.com","http://agenticrag360.com"]}
+      # Uses PUBLIC_DOMAIN and PUBLIC_PROTOCOL from .env
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-["${PUBLIC_PROTOCOL:-https}://${PUBLIC_DOMAIN:-localhost}","http://${PUBLIC_DOMAIN:-localhost}"]}
 
       # File Storage
       UPLOAD_DIR: /app/uploads
       MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-10485760}  # 10MB default
 
       # OAuth Providers (Optional)
+      # Uses PUBLIC_DOMAIN and PUBLIC_PROTOCOL from .env
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-https://agenticrag360.com/api/auth/google/callback}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-${PUBLIC_PROTOCOL:-https}://${PUBLIC_DOMAIN:-localhost}/api/auth/google/callback}
 
       # Messaging Platforms (Optional)
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
