@@ -108,6 +108,29 @@ echo -e "  Backend API:   ${GREEN}${NEW_PROTOCOL}://${NEW_DOMAIN}/api${NC}"
 echo -e "  OAuth Callback: ${GREEN}${NEW_PROTOCOL}://${NEW_DOMAIN}/api/auth/google/callback${NC}"
 echo ""
 
+# Check if using a domain (not IP or localhost)
+IS_DOMAIN=false
+if [[ ! "$NEW_DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && [[ "$NEW_DOMAIN" != "localhost" ]]; then
+    IS_DOMAIN=true
+fi
+
+# Remind about DNS update if using domain
+if [ "$IS_DOMAIN" = true ]; then
+    echo -e "${YELLOW}⚠ Important: Update DNS in Namecheap${NC}"
+    echo -e "  ${BLUE}Since you're using a domain ($NEW_DOMAIN), you MUST update DNS:${NC}"
+    echo -e "  1. Login to: ${BLUE}https://www.namecheap.com/${NC}"
+    echo -e "  2. Domain List → Manage → ${GREEN}Advanced DNS${NC}"
+    echo -e "  3. Update A Records:"
+    echo -e "     - ${GREEN}@${NC}   → ${GREEN}$(curl -s ifconfig.me)${NC} (your current EC2 IP)"
+    echo -e "     - ${GREEN}www${NC} → ${GREEN}$(curl -s ifconfig.me)${NC}"
+    echo -e "  4. Click ${GREEN}Save all changes${NC}"
+    echo -e "  5. Wait 15-30 minutes for DNS propagation"
+    echo ""
+    echo -e "  Check propagation: ${GREEN}nslookup $NEW_DOMAIN${NC}"
+    echo -e "  Full guide: ${BLUE}docs/deployment/NAMECHEAP_DNS_UPDATE.md${NC}"
+    echo ""
+fi
+
 # Update Google OAuth redirect URI
 echo -e "${YELLOW}⚠ Important: Update Google OAuth Redirect URI${NC}"
 echo -e "  Go to: ${BLUE}https://console.cloud.google.com/apis/credentials${NC}"

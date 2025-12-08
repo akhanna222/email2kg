@@ -1,6 +1,11 @@
 # 🚀 Quick IP Update Guide
 
-Your EC2 IP changed to **34.245.66.42**? Here's how to update it in **30 seconds**:
+Your EC2 IP changed to **34.245.66.42**? You need to update **TWO places**:
+
+1. ✅ **Email2KG Configuration** (this guide)
+2. ⚠️ **Namecheap DNS** (if using domain) - [See below](#-namecheap-dns-update)
+
+## Update Email2KG (30 seconds)
 
 ## Method 1: Use the Update Script (Easiest)
 
@@ -69,6 +74,29 @@ https://34.245.66.42
 ```
 https://34.245.66.42/api
 ```
+
+## 🌐 Namecheap DNS Update
+
+**If you're using a domain (e.g., agenticrag360.com), you MUST update DNS:**
+
+### Quick Steps:
+1. Login to Namecheap: https://www.namecheap.com/
+2. Domain List → Manage → **Advanced DNS**
+3. Update A Records:
+   - **@** → `34.245.66.42`
+   - **www** → `34.245.66.42`
+4. Click **Save all changes**
+5. Wait 15-30 minutes for DNS propagation
+
+### Check if DNS updated:
+```bash
+nslookup agenticrag360.com
+# Should show: 34.245.66.42
+```
+
+**📖 Detailed Guide:** [docs/deployment/NAMECHEAP_DNS_UPDATE.md](docs/deployment/NAMECHEAP_DNS_UPDATE.md)
+
+---
 
 ## ⚠️ Don't Forget: Update Google OAuth!
 
