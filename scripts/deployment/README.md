@@ -1,197 +1,170 @@
 # Deployment Scripts
 
-This directory contains automated scripts for deploying Email2KG to various environments.
+This directory contains automated deployment scripts for Email2KG.
 
-## 📜 Available Scripts
+## 📁 Scripts Overview
 
-### 🚀 **setup-letsencrypt.sh** (Recommended)
-**Purpose:** Automated HTTPS setup with free Let's Encrypt SSL certificates
+### Production Deployment
 
-**Use this when:**
-- ✅ Deploying to production with a custom domain
-- ✅ You want automatic SSL certificate management
-- ✅ You need free, auto-renewing certificates
+#### `enable-https.sh` ⭐ **Recommended**
+**One-command SSL/HTTPS setup for production**
 
-**Requirements:**
-- Domain name pointing to your server
-- Ports 80 and 443 accessible from internet
-- Root or sudo access
-
-**Usage:**
 ```bash
-cd ~/email2kg
-sudo ./scripts/deployment/setup-letsencrypt.sh
+sudo ./enable-https.sh
 ```
 
 **What it does:**
-1. Installs Certbot (Let's Encrypt client)
-2. Temporarily switches to HTTP-only mode
-3. Obtains SSL certificate from Let's Encrypt
-4. Configures nginx for HTTPS
-5. Sets up automatic certificate renewal (every 90 days)
-6. Restarts services with HTTPS enabled
+- ✅ Validates prerequisites (DNS, ports, services)
+- ✅ Obtains free SSL certificate from Let's Encrypt
+- ✅ Configures HTTPS with auto-renewal
+- ✅ Restarts services with SSL enabled
 
-**Time:** ~5-10 minutes
+**Requirements:**
+- Domain pointing to server
+- Ports 80 and 443 open
+- Docker running
+
+**Documentation:** See `docs/deployment/QUICK_START_SSL.md`
 
 ---
 
-### 🔐 **setup-https.sh** (Manual SSL)
-**Purpose:** Manual HTTPS setup with purchased SSL certificates (e.g., Namecheap, GoDaddy)
+#### `setup-letsencrypt.sh`
+**Complete Let's Encrypt SSL setup** (Called by `enable-https.sh`)
 
-**Use this when:**
-- You already purchased an SSL certificate
-- You have specific SSL requirements (EV certificates, etc.)
-- You prefer commercial SSL providers
-
-**Requirements:**
-- SSL certificate files (`.crt` and `.key`)
-- Certificate downloaded and accessible
-
-**Usage:**
 ```bash
-cd ~/email2kg
-./scripts/deployment/setup-https.sh
+sudo ./setup-letsencrypt.sh
 ```
 
 **What it does:**
-1. Creates `ssl/` directory
-2. Guides you to place certificate files
-3. Sets correct file permissions
-4. Updates docker-compose configuration
-5. Rebuilds containers with HTTPS
+- Switches to HTTP-only mode temporarily
+- Runs certbot for certificate acquisition
+- Copies certificates to `ssl/` directory
+- Configures auto-renewal hooks
+- Restarts with HTTPS enabled
 
-**Time:** ~10-15 minutes (including certificate download)
+**Note:** Use `enable-https.sh` instead for better UX.
 
 ---
 
-### ☁️ **deploy-ec2.sh** (EC2 Quick Deploy)
-**Purpose:** Rapid deployment to AWS EC2 instance
+#### `deploy-ec2.sh`
+**Automated EC2 first-time deployment**
 
-**Use this when:**
-- Setting up Email2KG on a fresh EC2 instance
-- You want automated installation of all dependencies
-- Testing or demo deployments
-
-**Requirements:**
-- Ubuntu 22.04+ EC2 instance (t3.medium or larger)
-- SSH access to the instance
-- Ports 22, 80, 443 open in security group
-
-**Usage:**
 ```bash
-# SSH into your EC2 instance first
-ssh -i your-key.pem ubuntu@your-ec2-ip
-
-# Then run:
-git clone https://github.com/yourusername/email2kg.git
-cd email2kg
-chmod +x scripts/deployment/deploy-ec2.sh
-./scripts/deployment/deploy-ec2.sh
+sudo ./deploy-ec2.sh
 ```
 
 **What it does:**
-1. Updates system packages
-2. Installs Docker and Docker Compose
-3. Clones/updates repository
-4. Configures environment variables
-5. Builds and starts all services
-6. Sets up systemd services for auto-start
+- Detects EC2 public IP automatically
+- Creates `.env` from template
+- Configures all services
+- Builds and starts Docker containers
 
-**Time:** ~20-30 minutes
+**Use case:** First-time EC2 setup after SSH
 
-**Note:** After running this, you should run `setup-letsencrypt.sh` to enable HTTPS.
+**Documentation:** See `docs/deployment/EC2_DEPLOYMENT.md`
 
 ---
 
-### 🏗️ **deploy-aws.sh** (AWS ECS/Fargate)
-**Purpose:** Deploy to AWS ECS/Fargate for scalable production
+#### `deploy-aws.sh`
+**AWS ECS/Fargate deployment** (Advanced)
 
-**Use this when:**
-- You need auto-scaling capabilities
-- Expecting high traffic volumes
-- Want managed infrastructure
-- Need high availability
+```bash
+./deploy-aws.sh
+```
+
+**What it does:**
+- Deploys to AWS ECS/Fargate
+- Creates ECR repositories
+- Sets up load balancer
+- Configures auto-scaling
+
+**Use case:** Enterprise production on AWS managed services
 
 **Requirements:**
-- AWS account with ECS access
 - AWS CLI configured
-- Terraform installed (optional)
-- Budget: ~$100-200/month
+- Proper IAM permissions
 
-**Usage:**
+---
+
+## 🚀 Quick Start
+
+### For EC2 Production:
+
+```bash
+# 1. First-time setup
+cd ~/email2kg
+sudo ./scripts/deployment/deploy-ec2.sh
+
+# 2. Enable HTTPS
+sudo ./scripts/deployment/enable-https.sh
+
+# 3. Done! Access your site
+curl https://yourdomain.com/health
+```
+
+### For AWS ECS/Fargate:
+
 ```bash
 cd ~/email2kg
 ./scripts/deployment/deploy-aws.sh
 ```
 
-**What it does:**
-1. Creates ECS cluster
-2. Sets up load balancer
-3. Configures auto-scaling
-4. Deploys containers to Fargate
-5. Sets up CloudWatch monitoring
+## 🔧 Development Scripts
 
-**Time:** ~30-45 minutes
+See `scripts/development/` for development-related scripts:
+- `setup-dev.sh` - Local development setup
+- `rebuild-frontend.sh` - Frontend rebuild
 
----
+## 📚 Documentation
 
-## 🎯 Which Script Should I Use?
+- **EC2 Deployment**: `docs/deployment/EC2_DEPLOYMENT.md`
+- **SSL Setup**: `docs/deployment/SSL_SETUP_GUIDE.md`
+- **Quick SSL**: `docs/deployment/QUICK_START_SSL.md`
+- **IP Management**: `docs/deployment/IP_CHANGE_CHECKLIST.md`
+- **DNS Setup**: `docs/deployment/NAMECHEAP_DNS_UPDATE.md`
 
-### For Production Deployment:
-1. Start with `deploy-ec2.sh` to set up the EC2 instance
-2. Then run `setup-letsencrypt.sh` to enable HTTPS
-3. Done! Your app is production-ready
+## ⚡ Common Tasks
 
-### For Development/Testing:
-- Use `docker-compose` directly (see [Quick Start Guide](../../docs/guides/quickstart.md))
-
-### For High-Traffic Production:
-- Use `deploy-aws.sh` for ECS/Fargate deployment
-
-### For Custom SSL Certificates:
-- Use `setup-https.sh` if you have purchased certificates
-
----
-
-## 🐛 Troubleshooting
-
-### Script Permission Denied
+### Update domain/IP when EC2 IP changes:
 ```bash
-chmod +x scripts/deployment/*.sh
+scripts/utils/update-domain.sh
 ```
 
-### Port Already in Use
+### Restart services:
 ```bash
-# Check what's using port 80/443
-sudo lsof -i :80
-sudo lsof -i :443
-
-# Stop nginx if running
-sudo systemctl stop nginx
-sudo systemctl disable nginx
+sudo docker compose down
+sudo docker compose up -d
 ```
 
-### Let's Encrypt Rate Limit
-- Let's Encrypt has rate limits: 50 certificates per domain per week
-- If you hit the limit, wait 7 days or use staging environment for testing
-
-### Docker Not Found
+### View logs:
 ```bash
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker $USER
+sudo docker compose logs -f
 ```
+
+### Check service status:
+```bash
+sudo docker ps
+```
+
+## 🆘 Troubleshooting
+
+**Services not starting:**
+```bash
+sudo docker compose down
+sudo docker compose up -d
+sudo docker compose logs -f
+```
+
+**SSL certificate issues:**
+```bash
+sudo certbot certificates
+sudo certbot renew --dry-run
+```
+
+**Permission denied:**
+- Make sure to run scripts with `sudo` for Docker commands
+- Check script is executable: `chmod +x script.sh`
 
 ---
 
-## 📚 Additional Resources
-
-- [Deployment Documentation](../../docs/deployment/)
-- [HTTPS Setup Guide](../../docs/deployment/https-setup.md)
-- [AWS EC2 Guide](../../docs/deployment/aws-ec2.md)
-- [Troubleshooting Guide](../../docs/deployment/testing.md)
-
----
-
-**Last Updated:** December 2025
+For detailed troubleshooting, see the full documentation in `docs/deployment/`.
