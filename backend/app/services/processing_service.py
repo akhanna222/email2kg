@@ -3,9 +3,12 @@ from app.db.models import Document, Transaction, Party, ProcessingStatus, Docume
 from app.services.pdf_service import PDFService
 from app.services.llm_service import LLMService
 from app.services.template_service import TemplateService
+from app.services.vision_ocr_service import VisionOCRService
+from app.core.config import settings
 from datetime import datetime
 from typing import Optional
 import time
+import os
 
 
 class ProcessingService:
@@ -16,6 +19,7 @@ class ProcessingService:
         self.pdf_service = PDFService()
         self.llm_service = LLMService()
         self.template_service = TemplateService(db)
+        self.vision_ocr = VisionOCRService(api_key=settings.OPENAI_API_KEY)
 
     def process_document(self, document_id: int) -> bool:
         """
@@ -37,8 +41,26 @@ class ProcessingService:
             document.processing_status = ProcessingStatus.PROCESSING
             self.db.commit()
 
-            # Step 1: Extract text
-            extracted_text = self.pdf_service.extract_text(document.file_path)
+            # Step 1: Extract text based on file type
+            file_ext = os.path.splitext(document.file_path.lower())[1]
+
+            if file_ext == '.pdf':
+                # PDF extraction
+                extracted_text = self.pdf_service.extract_text(document.file_path)
+            elif file_ext in {'.jpg', '.jpeg', '.png', '.tiff', '.tif', '.webp', '.bmp'}:
+                # Image extraction using Vision OCR
+                ocr_result = self.vision_ocr.extract_text_from_image_file(
+                    document.file_path,
+                    extract_structure=False,
+                    detail_level="high"
+                )
+                extracted_text = ocr_result.get('text', '')
+            else:
+                # Unsupported file type
+                document.processing_status = ProcessingStatus.FAILED
+                self.db.commit()
+                return False
+
             document.extracted_text = extracted_text
 
             if not extracted_text or len(extracted_text.strip()) < 20:

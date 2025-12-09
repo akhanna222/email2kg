@@ -6,7 +6,7 @@ import os
 import shutil
 
 from app.db.database import get_db
-from app.db.models import Document, Transaction, Email, User, ProcessingStatus
+from app.db.models import Document, Transaction, Email, User, ProcessingStatus, EmailDocumentLink
 from app.services.gmail_service import GmailService
 from app.services.processing_service import ProcessingService
 from app.services.query_service import QueryService
@@ -15,6 +15,14 @@ from app.services.template_service import TemplateService
 from app.core.config import settings
 from app.core.auth import get_current_active_user
 from pydantic import BaseModel
+
+# Import workers for background processing
+from app.workers.attachment_processor import (
+    process_email_attachment,
+    process_all_email_attachments,
+    bulk_process_email_attachments
+)
+from app.workers.document_processor import process_uploaded_document
 
 router = APIRouter()
 
@@ -81,10 +89,14 @@ async def oauth_callback(
 
 @router.post("/sync/gmail")
 async def sync_gmail(
+    process_attachments: bool = Query(True, description="Automatically process attachments"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Sync emails from Gmail for the authenticated user."""
+    """
+    Sync emails from Gmail for the authenticated user.
+    Optionally process attachments automatically in the background.
+    """
     if not current_user.gmail_access_token:
         raise HTTPException(status_code=401, detail="Gmail not connected")
 
@@ -96,6 +108,8 @@ async def sync_gmail(
         )
 
         new_count = 0
+        new_email_ids = []
+
         for email_data in emails:
             # Check if email already exists
             existing = db.query(Email).filter(
@@ -112,22 +126,162 @@ async def sync_gmail(
                     body_text=email_data["body_text"]
                 )
                 db.add(email)
+                db.flush()  # Get ID without full commit
+                new_email_ids.append(email.id)
                 new_count += 1
-
-                # TODO: Process attachments in background job
 
         db.commit()
         current_user.last_sync = datetime.utcnow()
         db.commit()
 
+        # Process attachments in background if requested
+        attachments_queued = 0
+        if process_attachments and new_email_ids:
+            try:
+                # Queue bulk attachment processing
+                result = bulk_process_email_attachments.apply_async(
+                    args=[new_email_ids, current_user.id],
+                    queue="attachments"
+                )
+                attachments_queued = len(new_email_ids)
+            except Exception as e:
+                # Log but don't fail the sync if background processing fails
+                print(f"Warning: Failed to queue attachment processing: {e}")
+
         return {
             "message": f"Synced {new_count} new emails",
             "total_fetched": len(emails),
-            "new_emails": new_count
+            "new_emails": new_count,
+            "attachments_processing": process_attachments,
+            "emails_queued_for_attachment_processing": attachments_queued
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+
+
+@router.post("/emails/{email_id}/process-attachments")
+async def process_email_attachments_endpoint(
+    email_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Manually trigger attachment processing for a specific email.
+    Useful for reprocessing or processing emails synced without auto-processing.
+    """
+    # Verify email exists
+    email = db.query(Email).filter(Email.id == email_id).first()
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+
+    try:
+        # Queue attachment processing
+        result = process_all_email_attachments.apply_async(
+            args=[email_id, current_user.id],
+            queue="attachments"
+        )
+
+        return {
+            "message": "Attachment processing queued",
+            "email_id": email_id,
+            "task_id": result.id,
+            "status": "queued"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to queue processing: {str(e)}")
+
+
+@router.get("/emails")
+async def get_emails(
+    limit: int = Query(50, le=500),
+    offset: int = Query(0),
+    has_attachments: Optional[bool] = Query(None, description="Filter emails with/without attachments"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get emails for the authenticated user with optional filters."""
+    query = db.query(Email)
+
+    # Apply filters
+    if has_attachments is not None:
+        if has_attachments:
+            # Emails that have linked documents
+            query = query.join(EmailDocumentLink).distinct()
+        # Note: filtering for emails WITHOUT attachments is harder, skip for now
+
+    total = query.count()
+
+    emails = query.order_by(Email.timestamp.desc()).offset(offset).limit(limit).all()
+
+    results = []
+    for email in emails:
+        # Count linked documents
+        doc_count = db.query(EmailDocumentLink).filter(
+            EmailDocumentLink.email_id == email.id
+        ).count()
+
+        results.append({
+            "id": email.id,
+            "gmail_id": email.gmail_id,
+            "subject": email.subject,
+            "sender": email.sender,
+            "receiver": email.receiver,
+            "timestamp": email.timestamp.isoformat() if email.timestamp else None,
+            "body_preview": email.body_text[:200] if email.body_text else "",
+            "attached_documents": doc_count,
+            "created_at": email.created_at.isoformat()
+        })
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "emails": results
+    }
+
+
+@router.get("/emails/{email_id}")
+async def get_email_detail(
+    email_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get detailed information about a specific email."""
+    email = db.query(Email).filter(Email.id == email_id).first()
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+
+    # Get linked documents
+    links = db.query(EmailDocumentLink).filter(
+        EmailDocumentLink.email_id == email_id
+    ).all()
+
+    documents = []
+    for link in links:
+        doc = db.query(Document).filter(Document.id == link.document_id).first()
+        if doc:
+            documents.append({
+                "id": doc.id,
+                "filename": doc.filename,
+                "processing_status": doc.processing_status.value,
+                "document_type": doc.document_type.value if doc.document_type else None,
+                "file_size": doc.file_size,
+                "processed_at": doc.processed_at.isoformat() if doc.processed_at else None
+            })
+
+    return {
+        "id": email.id,
+        "gmail_id": email.gmail_id,
+        "subject": email.subject,
+        "sender": email.sender,
+        "receiver": email.receiver,
+        "timestamp": email.timestamp.isoformat() if email.timestamp else None,
+        "body_text": email.body_text,
+        "attached_documents": documents,
+        "created_at": email.created_at.isoformat()
+    }
 
 
 # ========== Document Upload Routes ==========
