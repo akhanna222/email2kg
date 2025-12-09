@@ -1,8 +1,6 @@
 # Development Docker Compose Configuration
 # For local development with hot reload and debugging enabled
 
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:

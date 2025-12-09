@@ -1,3 +1,5 @@
+# HTTP-only Docker Compose (temporary, for SSL certificate acquisition)
+
 services:
   # PostgreSQL Database
   postgres:

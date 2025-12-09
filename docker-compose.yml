@@ -1,8 +1,6 @@
 # Production Docker Compose Configuration
 # For production deployment with HTTPS, security, and performance optimizations
 
-version: '3.8'
-
 services:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # DATABASE SERVICES
