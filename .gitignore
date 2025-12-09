@@ -80,3 +80,10 @@ ssl/
 # Temporary files
 tmp/
 temp/
+
+# Docker volumes
+postgres_data/
+redis_data/
+
+# Alembic
+alembic/versions/*.pyc
