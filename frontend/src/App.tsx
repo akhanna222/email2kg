@@ -5,6 +5,7 @@ import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 import TransactionList from './components/TransactionList';
 import DocumentViewer from './components/DocumentViewer';
+import EmailViewer from './components/EmailViewer';
 import Upload from './components/Upload';
 import Query from './components/Query';
 import GmailConnect from './components/GmailConnect';
@@ -138,6 +139,14 @@ const AppContent: React.FC = () => {
             element={
               <ProtectedRoute>
                 <DocumentViewer />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/email/:id"
+            element={
+              <ProtectedRoute>
+                <EmailViewer />
               </ProtectedRoute>
             }
           />
