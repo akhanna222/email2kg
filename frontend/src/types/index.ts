@@ -6,6 +6,7 @@ export interface Transaction {
   type: string;
   vendor: string | null;
   document_id: number | null;
+  email_id: number | null;
   description: string;
 }
 
@@ -25,6 +26,7 @@ export interface Document {
 export interface Filters {
   vendors: string[];
   document_types: string[];
+  currencies: string[];
   date_range: {
     min: string | null;
     max: string | null;

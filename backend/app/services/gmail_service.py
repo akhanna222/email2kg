@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import base64
 import email
+import os
 from email.mime.text import MIMEText
 from app.core.config import settings
 
@@ -15,8 +16,16 @@ class GmailService:
     SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
     @staticmethod
-    def get_auth_url() -> str:
-        """Generate OAuth authorization URL."""
+    def get_auth_url(user_id: int) -> str:
+        """
+        Generate OAuth authorization URL with user context.
+
+        Args:
+            user_id: User ID to pass through OAuth flow via state parameter
+
+        Returns:
+            OAuth authorization URL
+        """
         flow = Flow.from_client_config(
             {
                 "web": {
@@ -31,10 +40,11 @@ class GmailService:
             redirect_uri=settings.GOOGLE_REDIRECT_URI
         )
 
+        # Pass user_id as state to identify user after OAuth redirect
         auth_url, _ = flow.authorization_url(
             access_type='offline',
-            include_granted_scopes='true',
-            prompt='consent'
+            prompt='consent',
+            state=str(user_id)
         )
 
         return auth_url
@@ -66,13 +76,14 @@ class GmailService:
         }
 
     @staticmethod
-    def fetch_emails(access_token: str, months: int = 3) -> List[Dict]:
+    def fetch_emails(access_token: str, months: int = 3, max_emails: Optional[int] = None) -> List[Dict]:
         """
         Fetch emails from Gmail.
 
         Args:
             access_token: OAuth access token
             months: Number of months to fetch (default 3)
+            max_emails: Maximum number of emails to fetch (None = unlimited)
 
         Returns:
             List of email dictionaries
@@ -87,14 +98,35 @@ class GmailService:
         emails = []
 
         try:
-            # Get list of messages
-            results = service.users().messages().list(
-                userId='me',
-                q=query,
-                maxResults=500  # Limit for MVP
-            ).execute()
+            # Get list of messages (fetch all matching messages with pagination)
+            messages = []
+            page_token = None
 
-            messages = results.get('messages', [])
+            while True:
+                # Determine how many to fetch in this page
+                if max_emails:
+                    remaining = max_emails - len(messages)
+                    if remaining <= 0:
+                        break
+                    page_size = min(500, remaining)
+                else:
+                    page_size = 500
+
+                results = service.users().messages().list(
+                    userId='me',
+                    q=query,
+                    maxResults=page_size,
+                    pageToken=page_token
+                ).execute()
+
+                messages.extend(results.get('messages', []))
+                page_token = results.get('nextPageToken')
+
+                # Break if no more pages or reached max_emails
+                if not page_token:
+                    break
+                if max_emails and len(messages) >= max_emails:
+                    break
 
             for message in messages:
                 # Get full message details
@@ -232,19 +264,35 @@ class GmailService:
 
     @staticmethod
     def _get_attachments_info(payload: Dict) -> List[Dict]:
-        """Extract attachment information (PDFs only for MVP)."""
+        """
+        Extract attachment information from email payload.
+        Supports PDFs and images (jpg, jpeg, png, tiff, tif, webp, bmp).
+        """
         attachments = []
+        supported_extensions = {'.pdf', '.jpg', '.jpeg', '.png', '.tiff', '.tif', '.webp', '.bmp'}
 
-        if 'parts' in payload:
-            for part in payload['parts']:
-                if part.get('filename') and part['filename'].lower().endswith('.pdf'):
-                    attachments.append({
-                        "filename": part['filename'],
-                        "mime_type": part['mimeType'],
-                        "size": part['body'].get('size', 0),
-                        "attachment_id": part['body'].get('attachmentId')
-                    })
+        def _extract_from_part(part: Dict):
+            """Recursively extract attachments from email parts."""
+            if isinstance(part, dict):
+                filename = part.get('filename', '')
+                if filename:
+                    file_ext = os.path.splitext(filename.lower())[1]
+                    if file_ext in supported_extensions:
+                        attachment_id = part.get('body', {}).get('attachmentId')
+                        if attachment_id:
+                            attachments.append({
+                                "filename": filename,
+                                "mime_type": part.get('mimeType', 'application/octet-stream'),
+                                "size": part.get('body', {}).get('size', 0),
+                                "attachment_id": attachment_id
+                            })
 
+                # Check nested parts
+                if 'parts' in part:
+                    for subpart in part['parts']:
+                        _extract_from_part(subpart)
+
+        _extract_from_part(payload)
         return attachments
 
     @staticmethod

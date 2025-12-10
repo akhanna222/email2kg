@@ -14,6 +14,7 @@ const TransactionList: React.FC = () => {
   const [dateTo, setDateTo] = useState('');
   const [vendor, setVendor] = useState('');
   const [docType, setDocType] = useState('');
+  const [currency, setCurrency] = useState('');
 
   useEffect(() => {
     loadFilters();
@@ -37,6 +38,7 @@ const TransactionList: React.FC = () => {
       if (dateTo) params.date_to = dateTo;
       if (vendor) params.vendor = vendor;
       if (docType) params.doc_type = docType;
+      if (currency) params.currency = currency;
 
       const data = await getTransactions(params);
       setTransactions(data.transactions);
@@ -57,6 +59,7 @@ const TransactionList: React.FC = () => {
     setDateTo('');
     setVendor('');
     setDocType('');
+    setCurrency('');
     setTimeout(loadTransactions, 0);
   };
 
@@ -107,6 +110,18 @@ const TransactionList: React.FC = () => {
           </select>
         </div>
 
+        <div className="filter-group">
+          <label>Currency:</label>
+          <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+            <option value="">All Currencies</option>
+            {filters?.currencies?.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <button onClick={handleFilterChange}>Apply Filters</button>
         <button onClick={clearFilters}>Clear Filters</button>
       </div>
@@ -146,12 +161,20 @@ const TransactionList: React.FC = () => {
                     </span>
                   </td>
                   <td className="amount">
-                    ${txn.amount.toFixed(2)} {txn.currency}
+                    {txn.amount.toFixed(2)} {txn.currency}
                   </td>
                   <td>{txn.description}</td>
                   <td>
                     {txn.document_id && (
-                      <a href={`/document/${txn.document_id}`}>View Doc</a>
+                      <>
+                        <a href={`/document/${txn.document_id}`}>View Doc</a>
+                        {txn.email_id && (
+                          <>
+                            {' | '}
+                            <a href={`/email/${txn.email_id}`}>View Email</a>
+                          </>
+                        )}
+                      </>
                     )}
                   </td>
                 </tr>

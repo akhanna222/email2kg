@@ -205,6 +205,13 @@ class QueryService:
                 Document.user_id == self.user_id
             ).distinct().all()
 
+            # Get currencies for user's transactions
+            currencies = self.db.query(Transaction.currency).join(
+                Document, Transaction.document_id == Document.id
+            ).filter(
+                Document.user_id == self.user_id
+            ).distinct().all()
+
             # Get date range for user's transactions
             date_range = self.db.query(
                 func.min(Transaction.transaction_date).label('min_date'),
@@ -221,6 +228,9 @@ class QueryService:
             # Get all document types
             doc_types = self.db.query(Transaction.transaction_type).distinct().all()
 
+            # Get all currencies
+            currencies = self.db.query(Transaction.currency).distinct().all()
+
             # Get date range for all transactions
             date_range = self.db.query(
                 func.min(Transaction.transaction_date).label('min_date'),
@@ -230,6 +240,7 @@ class QueryService:
         return {
             "vendors": [v[0] for v in vendors],
             "document_types": [d[0] for d in doc_types if d[0]],
+            "currencies": [c[0] for c in currencies if c[0]],
             "date_range": {
                 "min": date_range[0].isoformat() if date_range[0] else None,
                 "max": date_range[1].isoformat() if date_range[1] else None

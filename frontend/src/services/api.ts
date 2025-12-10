@@ -39,6 +39,16 @@ api.interceptors.response.use(
 );
 
 // Auth
+export const getCurrentUser = async (): Promise<any> => {
+  const response = await api.get('/auth/me');
+  return response.data;
+};
+
+export const updateUserPreferences = async (preferences: { email_sync_limit?: number | null }): Promise<any> => {
+  const response = await api.patch('/auth/me/preferences', preferences);
+  return response.data;
+};
+
 export const getGoogleAuthUrl = async (): Promise<string> => {
   const response = await api.get('/auth/google');
   return response.data.auth_url;
@@ -74,6 +84,7 @@ export const getTransactions = async (params?: {
   date_to?: string;
   vendor?: string;
   doc_type?: string;
+  currency?: string;
   limit?: number;
   offset?: number;
 }): Promise<{ total: number; transactions: Transaction[] }> => {

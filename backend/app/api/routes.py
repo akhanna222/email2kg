@@ -55,34 +55,88 @@ class QueryRequest(BaseModel):
 # ========== Authentication Routes ==========
 
 @router.get("/auth/google", response_model=OAuthResponse)
-async def google_auth():
-    """Initiate Google OAuth flow."""
-    auth_url = GmailService.get_auth_url()
+async def google_auth(current_user: User = Depends(get_current_active_user)):
+    """Initiate Google OAuth flow with user context."""
+    # Pass user ID in state parameter to identify user after OAuth redirect
+    auth_url = GmailService.get_auth_url(user_id=current_user.id)
     return {"auth_url": auth_url}
 
 
-@router.post("/auth/callback", response_model=TokenResponse)
+@router.get("/auth/callback")
 async def oauth_callback(
-    request: OAuthCallbackRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    code: str,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    db: Session = Depends(get_db)
 ):
-    """Handle OAuth callback and store tokens for authenticated user."""
-    try:
-        tokens = GmailService.exchange_code_for_tokens(request.code)
+    """
+    Handle OAuth callback from Google.
 
-        # Update current user's Gmail tokens
-        current_user.gmail_access_token = tokens["access_token"]
-        current_user.gmail_refresh_token = tokens["refresh_token"]
-        current_user.gmail_token_expiry = tokens["token_expiry"]
-        current_user.gmail_connected = True
+    Google redirects here after user authorizes with query parameters:
+    - code: Authorization code to exchange for tokens
+    - state: User ID passed during OAuth initiation
+    - error: Error message if user denied access
+    """
+    from fastapi.responses import RedirectResponse
+
+    # Check if user denied access
+    if error:
+        return RedirectResponse(
+            url=f"https://agenticrag360.com/dashboard?gmail_error=access_denied",
+            status_code=302
+        )
+
+    if not code:
+        return RedirectResponse(
+            url=f"https://agenticrag360.com/dashboard?gmail_error=no_code",
+            status_code=302
+        )
+
+    if not state:
+        return RedirectResponse(
+            url=f"https://agenticrag360.com/dashboard?gmail_error=no_user_id",
+            status_code=302
+        )
+
+    try:
+        # Extract user ID from state
+        user_id = int(state)
+
+        # Get user from database
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return RedirectResponse(
+                url=f"https://agenticrag360.com/dashboard?gmail_error=user_not_found",
+                status_code=302
+            )
+
+        # Exchange code for tokens
+        tokens = GmailService.exchange_code_for_tokens(code)
+
+        # Update user's Gmail tokens
+        user.gmail_access_token = tokens["access_token"]
+        user.gmail_refresh_token = tokens["refresh_token"]
+        user.gmail_token_expiry = tokens["token_expiry"]
+        user.gmail_connected = True
 
         db.commit()
 
-        return {"message": "Successfully connected Gmail", "user_id": current_user.id}
+        # Redirect back to frontend with success
+        return RedirectResponse(
+            url="https://agenticrag360.com/dashboard?gmail_connected=true",
+            status_code=302
+        )
 
+    except ValueError:
+        return RedirectResponse(
+            url=f"https://agenticrag360.com/dashboard?gmail_error=invalid_state",
+            status_code=302
+        )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"OAuth failed: {str(e)}")
+        return RedirectResponse(
+            url=f"https://agenticrag360.com/dashboard?gmail_error={str(e)}",
+            status_code=302
+        )
 
 
 # ========== Email Sync Routes ==========
@@ -101,10 +155,14 @@ async def sync_gmail(
         raise HTTPException(status_code=401, detail="Gmail not connected")
 
     try:
+        # Get email sync limit from user preferences (default: None = unlimited)
+        email_limit = current_user.preferences.get('email_sync_limit') if current_user.preferences else None
+
         # Fetch emails
         emails = GmailService.fetch_emails(
             current_user.gmail_access_token,
-            months=settings.EMAIL_FETCH_MONTHS
+            months=settings.EMAIL_FETCH_MONTHS,
+            max_emails=email_limit
         )
 
         new_count = 0
@@ -353,6 +411,7 @@ async def get_transactions(
     date_to: Optional[str] = Query(None),
     vendor: Optional[str] = Query(None),
     doc_type: Optional[str] = Query(None),
+    currency: Optional[str] = Query(None),
     limit: int = Query(100, le=1000),
     offset: int = Query(0),
     db: Session = Depends(get_db),
@@ -384,6 +443,9 @@ async def get_transactions(
     if doc_type:
         query = query.filter(Transaction.transaction_type == doc_type)
 
+    if currency:
+        query = query.filter(Transaction.currency == currency)
+
     # Get total count
     total = query.count()
 
@@ -399,6 +461,16 @@ async def get_transactions(
         if txn.party:
             party_name = txn.party.name
 
+        # Get email_id through EmailDocumentLink
+        email_id = None
+        if txn.document_id:
+            from app.db.models import EmailDocumentLink
+            email_link = db.query(EmailDocumentLink).filter(
+                EmailDocumentLink.document_id == txn.document_id
+            ).first()
+            if email_link:
+                email_id = email_link.email_id
+
         results.append({
             "id": txn.id,
             "amount": txn.amount,
@@ -407,6 +479,7 @@ async def get_transactions(
             "type": txn.transaction_type,
             "vendor": party_name,
             "document_id": txn.document_id,
+            "email_id": email_id,
             "description": txn.description
         })
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getGoogleAuthUrl, handleOAuthCallback, syncGmail } from '../services/api';
+import { getGoogleAuthUrl, syncGmail, getCurrentUser } from '../services/api';
 
 const GmailConnect: React.FC = () => {
   const [connected, setConnected] = useState(false);
@@ -7,25 +7,41 @@ const GmailConnect: React.FC = () => {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    // Check for OAuth callback
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
+    // Load connection status on mount
+    loadConnectionStatus();
 
-    if (code) {
-      handleCallback(code);
+    // Check for OAuth callback result
+    const urlParams = new URLSearchParams(window.location.search);
+    const gmailConnected = urlParams.get('gmail_connected');
+    const gmailError = urlParams.get('gmail_error');
+
+    if (gmailConnected === 'true') {
+      setMessage('Successfully connected to Gmail!');
+      // Reload user status to confirm
+      loadConnectionStatus();
+      // Clear the query params from URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (gmailError) {
+      const errorMessages: Record<string, string> = {
+        'access_denied': 'You denied access to Gmail. Please try again and approve the permissions.',
+        'no_code': 'No authorization code received from Google.',
+        'no_user_id': 'User session not found. Please log in again.',
+        'user_not_found': 'User account not found. Please log in again.',
+        'invalid_state': 'Invalid OAuth state. Please try again.',
+      };
+      const displayError = errorMessages[gmailError] || `Connection failed: ${gmailError}`;
+      setMessage(displayError);
+      // Clear the query params from URL
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
-  const handleCallback = async (code: string) => {
+  const loadConnectionStatus = async () => {
     try {
-      await handleOAuthCallback(code);
-      setConnected(true);
-      setMessage('Successfully connected to Gmail!');
-
-      // Clear the code from URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } catch (error: any) {
-      setMessage(`Connection failed: ${error.response?.data?.detail || error.message}`);
+      const user = await getCurrentUser();
+      setConnected(user.gmail_connected);
+    } catch (error) {
+      console.error('Failed to load connection status:', error);
     }
   };
 
@@ -81,11 +97,20 @@ const GmailConnect: React.FC = () => {
       <div className="info">
         <h3>What will be synced?</h3>
         <ul>
-          <li>Last 3 months of emails</li>
+          <li>ALL emails from last 3 months (no limits)</li>
           <li>Email subject, sender, receiver, timestamp</li>
-          <li>Email body text (plain text only)</li>
-          <li>PDF attachments only</li>
+          <li>Email body text (used for smart classification)</li>
+          <li>PDF and image attachments (JPG, PNG, TIFF, etc.)</li>
+          <li>OCR text extraction from all attachments</li>
+          <li>Smart document classification using email context</li>
         </ul>
+        <h3>How does classification work?</h3>
+        <ol>
+          <li>Email subject is analyzed for keywords (invoice, receipt, etc.)</li>
+          <li>Email body is checked for additional context</li>
+          <li>OCR extracts text from PDF/image attachments</li>
+          <li>AI classifies into: invoice, receipt, statement, contract, etc.</li>
+        </ol>
       </div>
     </div>
   );
