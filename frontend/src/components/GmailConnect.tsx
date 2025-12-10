@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getGoogleAuthUrl, handleOAuthCallback, syncGmail } from '../services/api';
+import { getGoogleAuthUrl, syncGmail } from '../services/api';
 
 const GmailConnect: React.FC = () => {
   const [connected, setConnected] = useState(false);
@@ -7,27 +7,30 @@ const GmailConnect: React.FC = () => {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    // Check for OAuth callback
+    // Check for OAuth callback result
     const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
+    const gmailConnected = urlParams.get('gmail_connected');
+    const gmailError = urlParams.get('gmail_error');
 
-    if (code) {
-      handleCallback(code);
-    }
-  }, []);
-
-  const handleCallback = async (code: string) => {
-    try {
-      await handleOAuthCallback(code);
+    if (gmailConnected === 'true') {
       setConnected(true);
       setMessage('Successfully connected to Gmail!');
-
-      // Clear the code from URL
+      // Clear the query params from URL
       window.history.replaceState({}, document.title, window.location.pathname);
-    } catch (error: any) {
-      setMessage(`Connection failed: ${error.response?.data?.detail || error.message}`);
+    } else if (gmailError) {
+      const errorMessages: Record<string, string> = {
+        'access_denied': 'You denied access to Gmail. Please try again and approve the permissions.',
+        'no_code': 'No authorization code received from Google.',
+        'no_user_id': 'User session not found. Please log in again.',
+        'user_not_found': 'User account not found. Please log in again.',
+        'invalid_state': 'Invalid OAuth state. Please try again.',
+      };
+      const displayError = errorMessages[gmailError] || `Connection failed: ${gmailError}`;
+      setMessage(displayError);
+      // Clear the query params from URL
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
-  };
+  }, []);
 
   const handleConnect = async () => {
     try {
