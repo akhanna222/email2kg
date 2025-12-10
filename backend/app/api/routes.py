@@ -753,6 +753,7 @@ async def get_processing_metrics(
     - Pages per email
     - Total characters processed
     - Characters per email
+    - Email qualification statistics
     """
     from sqlalchemy import func
 
@@ -766,7 +767,25 @@ async def get_processing_metrics(
     total_characters = 0
     emails_with_documents = 0
 
+    # Qualification statistics
+    emails_qualified = 0
+    emails_not_qualified = 0
+    emails_pending_qualification = 0
+    qualified_by_subject = 0
+    qualified_by_body = 0
+
     for email in emails:
+        # Track qualification stats
+        if email.is_qualified is None:
+            emails_pending_qualification += 1
+        elif email.is_qualified:
+            emails_qualified += 1
+            if email.qualification_stage == "subject":
+                qualified_by_subject += 1
+            elif email.qualification_stage == "body":
+                qualified_by_body += 1
+        else:
+            emails_not_qualified += 1
         # Get linked documents for this email
         links = db.query(EmailDocumentLink).filter(
             EmailDocumentLink.email_id == email.id
@@ -814,7 +833,14 @@ async def get_processing_metrics(
             "total_pages_processed": int(doc_stats.sum_pages or 0),
             "total_characters_processed": int(doc_stats.sum_characters or 0),
             "avg_pages_per_document": round(float(doc_stats.avg_pages or 0), 2),
-            "avg_characters_per_document": round(float(doc_stats.avg_characters or 0), 2)
+            "avg_characters_per_document": round(float(doc_stats.avg_characters or 0), 2),
+            # Qualification statistics
+            "emails_qualified": emails_qualified,
+            "emails_not_qualified": emails_not_qualified,
+            "emails_pending_qualification": emails_pending_qualification,
+            "qualified_by_subject": qualified_by_subject,
+            "qualified_by_body": qualified_by_body,
+            "qualification_rate": round(emails_qualified / total_emails * 100, 1) if total_emails > 0 else 0
         },
         "per_email_metrics": email_metrics[:50]  # Limit to 50 most recent for performance
     }

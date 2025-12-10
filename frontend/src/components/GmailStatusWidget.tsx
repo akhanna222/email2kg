@@ -18,6 +18,12 @@ interface ProcessingMetrics {
   total_characters_processed: number;
   avg_pages_per_document: number;
   avg_characters_per_document: number;
+  emails_qualified: number;
+  emails_not_qualified: number;
+  emails_pending_qualification: number;
+  qualified_by_subject: number;
+  qualified_by_body: number;
+  qualification_rate: number;
 }
 
 const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }) => {
@@ -204,27 +210,59 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
                       borderRadius: '4px',
                       fontSize: '0.85em'
                     }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5em' }}>
-                        <div>
-                          <strong>Total Emails:</strong> {metrics.total_emails}
+                      {/* Email Qualification Metrics */}
+                      <div style={{ marginBottom: '1em', paddingBottom: '1em', borderBottom: '1px solid #dee2e6' }}>
+                        <div style={{ fontWeight: 'bold', marginBottom: '0.5em', color: '#495057' }}>
+                          🤖 LLM Email Qualification
                         </div>
-                        <div>
-                          <strong>With Documents:</strong> {metrics.emails_with_documents}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5em' }}>
+                          <div>
+                            <strong>Qualified:</strong> {metrics.emails_qualified} ({metrics.qualification_rate}%)
+                          </div>
+                          <div>
+                            <strong>Not Qualified:</strong> {metrics.emails_not_qualified}
+                          </div>
+                          <div>
+                            <strong>By Subject:</strong> {metrics.qualified_by_subject}
+                          </div>
+                          <div>
+                            <strong>By Body:</strong> {metrics.qualified_by_body}
+                          </div>
+                          {metrics.emails_pending_qualification > 0 && (
+                            <div style={{ gridColumn: '1 / -1', color: '#856404' }}>
+                              <strong>Pending:</strong> {metrics.emails_pending_qualification}
+                            </div>
+                          )}
                         </div>
-                        <div>
-                          <strong>Total Documents:</strong> {metrics.total_documents}
+                      </div>
+
+                      {/* Processing Metrics */}
+                      <div>
+                        <div style={{ fontWeight: 'bold', marginBottom: '0.5em', color: '#495057' }}>
+                          📄 Document Processing
                         </div>
-                        <div>
-                          <strong>Total Pages:</strong> {metrics.total_pages_processed.toLocaleString()}
-                        </div>
-                        <div style={{ gridColumn: '1 / -1' }}>
-                          <strong>Total Characters:</strong> {metrics.total_characters_processed.toLocaleString()}
-                        </div>
-                        <div>
-                          <strong>Avg Pages/Doc:</strong> {metrics.avg_pages_per_document}
-                        </div>
-                        <div>
-                          <strong>Avg Chars/Doc:</strong> {Math.round(metrics.avg_characters_per_document).toLocaleString()}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5em' }}>
+                          <div>
+                            <strong>Total Emails:</strong> {metrics.total_emails}
+                          </div>
+                          <div>
+                            <strong>With Documents:</strong> {metrics.emails_with_documents}
+                          </div>
+                          <div>
+                            <strong>Total Documents:</strong> {metrics.total_documents}
+                          </div>
+                          <div>
+                            <strong>Total Pages:</strong> {metrics.total_pages_processed.toLocaleString()}
+                          </div>
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <strong>Total Characters:</strong> {metrics.total_characters_processed.toLocaleString()}
+                          </div>
+                          <div>
+                            <strong>Avg Pages/Doc:</strong> {metrics.avg_pages_per_document}
+                          </div>
+                          <div>
+                            <strong>Avg Chars/Doc:</strong> {Math.round(metrics.avg_characters_per_document).toLocaleString()}
+                          </div>
                         </div>
                       </div>
                     </div>

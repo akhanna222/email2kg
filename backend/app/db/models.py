@@ -37,6 +37,13 @@ class Email(Base):
     body_text = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # LLM qualification for processing
+    is_qualified = Column(Boolean, default=None, nullable=True)  # None = not checked yet
+    qualification_stage = Column(String, nullable=True)  # "subject", "body", or "none"
+    qualification_confidence = Column(Float, nullable=True)  # 0.0 to 1.0
+    qualification_reason = Column(Text, nullable=True)  # Explanation from LLM
+    qualified_at = Column(DateTime, nullable=True)  # When qualification was done
+
     # Relationships
     documents = relationship("Document", secondary="email_document_links", back_populates="emails")
 
