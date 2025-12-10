@@ -3,7 +3,7 @@
  * Shows connection status and provides quick connect/sync actions
  */
 import React, { useState, useEffect } from 'react';
-import { getGoogleAuthUrl, syncGmail, getCurrentUser } from '../services/api';
+import { getGoogleAuthUrl, syncGmail, getCurrentUser, updateUserPreferences } from '../services/api';
 import './GmailStatusWidget.css';
 
 interface GmailStatusWidgetProps {
@@ -15,6 +15,8 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [emailLimit, setEmailLimit] = useState<number | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     checkConnectionStatus();
@@ -26,8 +28,21 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
       const user = await getCurrentUser();
       setConnected(user.gmail_connected);
       setLastSync(user.last_sync);
+      setEmailLimit(user.preferences?.email_sync_limit || null);
     } catch (err) {
       console.error('Failed to check Gmail status:', err);
+    }
+  };
+
+  const handleEmailLimitChange = async (limit: number | null) => {
+    try {
+      setError(null);
+      await updateUserPreferences({ email_sync_limit: limit || 0 }); // 0 = unlimited
+      setEmailLimit(limit);
+      setShowSettings(false);
+    } catch (err: any) {
+      setError('Failed to update email limit');
+      console.error(err);
     }
   };
 
@@ -119,6 +134,53 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
               <p className="last-sync">
                 Last sync: <strong>{formatLastSync(lastSync)}</strong>
               </p>
+              <p className="email-limit-info" style={{ fontSize: '0.9em', color: '#666', marginTop: '0.5em' }}>
+                Email limit: <strong>{emailLimit ? `${emailLimit} emails` : 'Unlimited'}</strong>
+                {' '}
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#007bff',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    fontSize: '0.9em'
+                  }}
+                >
+                  {showSettings ? 'Hide' : 'Change'}
+                </button>
+              </p>
+              {showSettings && (
+                <div style={{ marginTop: '1em', padding: '1em', background: '#f8f9fa', borderRadius: '4px' }}>
+                  <p style={{ marginBottom: '0.5em', fontSize: '0.9em', fontWeight: 'bold' }}>Select email sync limit:</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5em' }}>
+                    {[
+                      { value: null, label: 'Unlimited (all emails)' },
+                      { value: 100, label: '100 emails' },
+                      { value: 500, label: '500 emails' },
+                      { value: 1000, label: '1,000 emails' },
+                      { value: 2000, label: '2,000 emails' }
+                    ].map(option => (
+                      <button
+                        key={option.value || 'unlimited'}
+                        onClick={() => handleEmailLimitChange(option.value)}
+                        style={{
+                          padding: '0.5em',
+                          background: emailLimit === option.value ? '#007bff' : 'white',
+                          color: emailLimit === option.value ? 'white' : '#333',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="widget-actions">

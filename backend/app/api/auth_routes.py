@@ -19,7 +19,8 @@ from app.schemas.auth import (
     Token,
     UserResponse,
     UserUpdate,
-    PasswordChange
+    PasswordChange,
+    PreferencesUpdate
 )
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -190,6 +191,39 @@ async def change_password(
     db.commit()
 
     return {"message": "Password updated successfully"}
+
+
+@router.patch("/me/preferences", response_model=UserResponse)
+async def update_user_preferences(
+    preferences: PreferencesUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update user preferences.
+
+    Args:
+        preferences: Updated preferences
+        current_user: Current authenticated user
+        db: Database session
+
+    Returns:
+        Updated user data
+    """
+    # Initialize preferences if None
+    if current_user.preferences is None:
+        current_user.preferences = {}
+
+    # Update email_sync_limit preference
+    if preferences.email_sync_limit is not None:
+        # 0 means unlimited, convert to None
+        limit_value = None if preferences.email_sync_limit == 0 else preferences.email_sync_limit
+        current_user.preferences['email_sync_limit'] = limit_value
+
+    db.commit()
+    db.refresh(current_user)
+
+    return current_user
 
 
 @router.post("/logout")

@@ -155,10 +155,14 @@ async def sync_gmail(
         raise HTTPException(status_code=401, detail="Gmail not connected")
 
     try:
+        # Get email sync limit from user preferences (default: None = unlimited)
+        email_limit = current_user.preferences.get('email_sync_limit') if current_user.preferences else None
+
         # Fetch emails
         emails = GmailService.fetch_emails(
             current_user.gmail_access_token,
-            months=settings.EMAIL_FETCH_MONTHS
+            months=settings.EMAIL_FETCH_MONTHS,
+            max_emails=email_limit
         )
 
         new_count = 0

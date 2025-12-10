@@ -76,13 +76,14 @@ class GmailService:
         }
 
     @staticmethod
-    def fetch_emails(access_token: str, months: int = 3) -> List[Dict]:
+    def fetch_emails(access_token: str, months: int = 3, max_emails: Optional[int] = None) -> List[Dict]:
         """
         Fetch emails from Gmail.
 
         Args:
             access_token: OAuth access token
             months: Number of months to fetch (default 3)
+            max_emails: Maximum number of emails to fetch (None = unlimited)
 
         Returns:
             List of email dictionaries
@@ -102,18 +103,29 @@ class GmailService:
             page_token = None
 
             while True:
+                # Determine how many to fetch in this page
+                if max_emails:
+                    remaining = max_emails - len(messages)
+                    if remaining <= 0:
+                        break
+                    page_size = min(500, remaining)
+                else:
+                    page_size = 500
+
                 results = service.users().messages().list(
                     userId='me',
                     q=query,
-                    maxResults=500,  # Max per page
+                    maxResults=page_size,
                     pageToken=page_token
                 ).execute()
 
                 messages.extend(results.get('messages', []))
                 page_token = results.get('nextPageToken')
 
-                # Break if no more pages
+                # Break if no more pages or reached max_emails
                 if not page_token:
+                    break
+                if max_emails and len(messages) >= max_emails:
                     break
 
             for message in messages:

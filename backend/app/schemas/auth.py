@@ -2,7 +2,7 @@
 Pydantic schemas for authentication endpoints.
 """
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime
 
 
@@ -39,6 +39,7 @@ class UserResponse(BaseModel):
     is_active: bool
     is_verified: bool
     gmail_connected: bool
+    preferences: Optional[Dict[str, Any]] = None
     created_at: datetime
     last_login: Optional[datetime] = None
     last_sync: Optional[datetime] = None
@@ -57,3 +58,12 @@ class PasswordChange(BaseModel):
     """Schema for password change."""
     current_password: str
     new_password: str = Field(..., min_length=8)
+
+
+class PreferencesUpdate(BaseModel):
+    """Schema for updating user preferences."""
+    email_sync_limit: Optional[int] = Field(
+        None,
+        ge=0,
+        description="Maximum number of emails to sync (0 or None = unlimited)"
+    )

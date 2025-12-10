@@ -44,6 +44,11 @@ export const getCurrentUser = async (): Promise<any> => {
   return response.data;
 };
 
+export const updateUserPreferences = async (preferences: { email_sync_limit?: number | null }): Promise<any> => {
+  const response = await api.patch('/auth/me/preferences', preferences);
+  return response.data;
+};
+
 export const getGoogleAuthUrl = async (): Promise<string> => {
   const response = await api.get('/auth/google');
   return response.data.auth_url;
