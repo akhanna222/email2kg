@@ -39,6 +39,11 @@ api.interceptors.response.use(
 );
 
 // Auth
+export const getCurrentUser = async (): Promise<any> => {
+  const response = await api.get('/auth/me');
+  return response.data;
+};
+
 export const getGoogleAuthUrl = async (): Promise<string> => {
   const response = await api.get('/auth/google');
   return response.data.auth_url;

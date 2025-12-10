@@ -3,8 +3,7 @@
  * Shows connection status and provides quick connect/sync actions
  */
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getGoogleAuthUrl, syncGmail } from '../services/api';
+import { getGoogleAuthUrl, syncGmail, getCurrentUser } from '../services/api';
 import './GmailStatusWidget.css';
 
 interface GmailStatusWidgetProps {
@@ -12,7 +11,6 @@ interface GmailStatusWidgetProps {
 }
 
 const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }) => {
-  const navigate = useNavigate();
   const [connected, setConnected] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
@@ -24,12 +22,10 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
 
   const checkConnectionStatus = async () => {
     try {
-      // Try to get status from localStorage or API
-      const status = localStorage.getItem('gmail_connected');
-      const lastSyncTime = localStorage.getItem('gmail_last_sync');
-
-      setConnected(status === 'true');
-      setLastSync(lastSyncTime);
+      // Fetch current user data from API
+      const user = await getCurrentUser();
+      setConnected(user.gmail_connected);
+      setLastSync(user.last_sync);
     } catch (err) {
       console.error('Failed to check Gmail status:', err);
     }
@@ -39,8 +35,6 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
     try {
       setError(null);
       const authUrl = await getGoogleAuthUrl();
-      // Store return path
-      localStorage.setItem('gmail_return_path', window.location.pathname);
       window.location.href = authUrl;
     } catch (err: any) {
       setError('Failed to initiate Gmail connection');
@@ -53,25 +47,18 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
     setError(null);
 
     try {
-      const result = await syncGmail();
-      const now = new Date().toISOString();
-      setLastSync(now);
-      localStorage.setItem('gmail_last_sync', now);
+      await syncGmail();
 
-      // Show success message briefly
+      // Refresh connection status to get latest last_sync time
       setTimeout(() => {
         checkConnectionStatus();
-      }, 2000);
+      }, 1000);
     } catch (err: any) {
-      setError('Sync failed. Please try again.');
+      setError(err.response?.data?.detail || 'Sync failed. Please try again.');
       console.error(err);
     } finally {
       setSyncing(false);
     }
-  };
-
-  const handleViewDetails = () => {
-    navigate('/gmail');
   };
 
   const formatLastSync = (isoString: string | null) => {
@@ -151,10 +138,6 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
                   </>
                 )}
               </button>
-
-              <button onClick={handleViewDetails} className="btn btn-secondary">
-                View Details
-              </button>
             </div>
           </div>
         ) : (
@@ -174,10 +157,6 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
                   <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c5.05-.5 9-4.76 9-9.95z" fill="currentColor"/>
                 </svg>
                 Connect Gmail
-              </button>
-
-              <button onClick={handleViewDetails} className="btn btn-link">
-                Learn More
               </button>
             </div>
 

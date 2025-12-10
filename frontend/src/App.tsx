@@ -63,9 +63,6 @@ const Navbar: React.FC = () => {
           <Link to="/query">Ask Question</Link>
         </li>
         <li>
-          <Link to="/gmail">Gmail</Link>
-        </li>
-        <li>
           <button
             onClick={logout}
             className="nav-logout"

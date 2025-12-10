@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getGoogleAuthUrl, syncGmail } from '../services/api';
+import { getGoogleAuthUrl, syncGmail, getCurrentUser } from '../services/api';
 
 const GmailConnect: React.FC = () => {
   const [connected, setConnected] = useState(false);
@@ -7,14 +7,18 @@ const GmailConnect: React.FC = () => {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
+    // Load connection status on mount
+    loadConnectionStatus();
+
     // Check for OAuth callback result
     const urlParams = new URLSearchParams(window.location.search);
     const gmailConnected = urlParams.get('gmail_connected');
     const gmailError = urlParams.get('gmail_error');
 
     if (gmailConnected === 'true') {
-      setConnected(true);
       setMessage('Successfully connected to Gmail!');
+      // Reload user status to confirm
+      loadConnectionStatus();
       // Clear the query params from URL
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (gmailError) {
@@ -31,6 +35,15 @@ const GmailConnect: React.FC = () => {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
+
+  const loadConnectionStatus = async () => {
+    try {
+      const user = await getCurrentUser();
+      setConnected(user.gmail_connected);
+    } catch (error) {
+      console.error('Failed to load connection status:', error);
+    }
+  };
 
   const handleConnect = async () => {
     try {
