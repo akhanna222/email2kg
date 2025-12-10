@@ -1,0 +1,140 @@
+# Pre-commit hooks for code quality
+# Install: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # ============================================================================
+  # GENERAL CHECKS
+  # ============================================================================
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+      - id: end-of-file-fixer
+        name: Fix end of files
+      - id: check-yaml
+        name: Check YAML syntax
+        args: ['--unsafe']  # Allow custom tags
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-toml
+        name: Check TOML syntax
+      - id: check-added-large-files
+        name: Check for large files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: detect-private-key
+        name: Detect private keys
+      - id: mixed-line-ending
+        name: Check line endings
+
+  # ============================================================================
+  # PYTHON CODE QUALITY
+  # ============================================================================
+
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        name: Format code with Black
+        language_version: python3.11
+        files: ^backend/
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: Sort imports with isort
+        args: ['--profile', 'black']
+        files: ^backend/
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.9
+    hooks:
+      - id: ruff
+        name: Lint with Ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^backend/
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: Type check with mypy
+        additional_dependencies: [types-all]
+        files: ^backend/app/
+        # Continue even if mypy finds issues (don't block commit)
+        verbose: true
+        args: ['--ignore-missing-imports']
+
+  # ============================================================================
+  # SECURITY CHECKS
+  # ============================================================================
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        name: Security check with Bandit
+        args: ['-c', 'pyproject.toml']
+        files: ^backend/
+        additional_dependencies: ['bandit[toml]']
+
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: v1.10.0
+    hooks:
+      - id: python-check-blanket-noqa
+        name: Check blanket noqa
+      - id: python-check-mock-methods
+        name: Check mock methods
+      - id: python-no-eval
+        name: Check for eval()
+      - id: python-no-log-warn
+        name: Check for log.warn()
+
+  # ============================================================================
+  # SECRETS DETECTION
+  # ============================================================================
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        name: Detect secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: package-lock.json
+
+  # ============================================================================
+  # DOCKER
+  # ============================================================================
+
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        name: Lint Dockerfiles
+
+  # ============================================================================
+  # MARKDOWN & DOCUMENTATION
+  # ============================================================================
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        name: Lint Markdown files
+        args: ['--fix']
+
+  # ============================================================================
+  # COMMIT MESSAGE
+  # ============================================================================
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.13.0
+    hooks:
+      - id: commitizen
+        name: Check commit message format
+        stages: [commit-msg]
