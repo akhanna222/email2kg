@@ -61,15 +61,38 @@ async def google_auth():
     return {"auth_url": auth_url}
 
 
-@router.post("/auth/callback", response_model=TokenResponse)
+@router.get("/auth/callback")
 async def oauth_callback(
-    request: OAuthCallbackRequest,
+    code: str,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Handle OAuth callback and store tokens for authenticated user."""
+    """
+    Handle OAuth callback from Google.
+
+    Google redirects here after user authorizes with query parameters:
+    - code: Authorization code to exchange for tokens
+    - state: Optional state parameter for CSRF protection
+    - error: Error message if user denied access
+    """
+    # Check if user denied access
+    if error:
+        raise HTTPException(
+            status_code=400,
+            detail=f"OAuth authorization denied: {error}"
+        )
+
+    if not code:
+        raise HTTPException(
+            status_code=400,
+            detail="Authorization code not provided"
+        )
+
     try:
-        tokens = GmailService.exchange_code_for_tokens(request.code)
+        # Exchange code for tokens
+        tokens = GmailService.exchange_code_for_tokens(code)
 
         # Update current user's Gmail tokens
         current_user.gmail_access_token = tokens["access_token"]
@@ -79,10 +102,20 @@ async def oauth_callback(
 
         db.commit()
 
-        return {"message": "Successfully connected Gmail", "user_id": current_user.id}
+        # Redirect back to frontend with success
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(
+            url="https://agenticrag360.com/settings?gmail_connected=true",
+            status_code=302
+        )
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"OAuth failed: {str(e)}")
+        # Redirect back to frontend with error
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(
+            url=f"https://agenticrag360.com/settings?gmail_error={str(e)}",
+            status_code=302
+        )
 
 
 # ========== Email Sync Routes ==========
