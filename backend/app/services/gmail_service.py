@@ -15,8 +15,16 @@ class GmailService:
     SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
     @staticmethod
-    def get_auth_url() -> str:
-        """Generate OAuth authorization URL."""
+    def get_auth_url(user_id: int) -> str:
+        """
+        Generate OAuth authorization URL with user context.
+
+        Args:
+            user_id: User ID to pass through OAuth flow via state parameter
+
+        Returns:
+            OAuth authorization URL
+        """
         flow = Flow.from_client_config(
             {
                 "web": {
@@ -31,10 +39,12 @@ class GmailService:
             redirect_uri=settings.GOOGLE_REDIRECT_URI
         )
 
+        # Pass user_id as state to identify user after OAuth redirect
         auth_url, _ = flow.authorization_url(
             access_type='offline',
             include_granted_scopes='true',
-            prompt='consent'
+            prompt='consent',
+            state=str(user_id)
         )
 
         return auth_url

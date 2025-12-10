@@ -55,9 +55,10 @@ class QueryRequest(BaseModel):
 # ========== Authentication Routes ==========
 
 @router.get("/auth/google", response_model=OAuthResponse)
-async def google_auth():
-    """Initiate Google OAuth flow."""
-    auth_url = GmailService.get_auth_url()
+async def google_auth(current_user: User = Depends(get_current_active_user)):
+    """Initiate Google OAuth flow with user context."""
+    # Pass user ID in state parameter to identify user after OAuth redirect
+    auth_url = GmailService.get_auth_url(user_id=current_user.id)
     return {"auth_url": auth_url}
 
 
@@ -66,52 +67,72 @@ async def oauth_callback(
     code: str,
     state: Optional[str] = None,
     error: Optional[str] = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    db: Session = Depends(get_db)
 ):
     """
     Handle OAuth callback from Google.
 
     Google redirects here after user authorizes with query parameters:
     - code: Authorization code to exchange for tokens
-    - state: Optional state parameter for CSRF protection
+    - state: User ID passed during OAuth initiation
     - error: Error message if user denied access
     """
+    from fastapi.responses import RedirectResponse
+
     # Check if user denied access
     if error:
-        raise HTTPException(
-            status_code=400,
-            detail=f"OAuth authorization denied: {error}"
+        return RedirectResponse(
+            url=f"https://agenticrag360.com/settings?gmail_error=access_denied",
+            status_code=302
         )
 
     if not code:
-        raise HTTPException(
-            status_code=400,
-            detail="Authorization code not provided"
+        return RedirectResponse(
+            url=f"https://agenticrag360.com/settings?gmail_error=no_code",
+            status_code=302
+        )
+
+    if not state:
+        return RedirectResponse(
+            url=f"https://agenticrag360.com/settings?gmail_error=no_user_id",
+            status_code=302
         )
 
     try:
+        # Extract user ID from state
+        user_id = int(state)
+
+        # Get user from database
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return RedirectResponse(
+                url=f"https://agenticrag360.com/settings?gmail_error=user_not_found",
+                status_code=302
+            )
+
         # Exchange code for tokens
         tokens = GmailService.exchange_code_for_tokens(code)
 
-        # Update current user's Gmail tokens
-        current_user.gmail_access_token = tokens["access_token"]
-        current_user.gmail_refresh_token = tokens["refresh_token"]
-        current_user.gmail_token_expiry = tokens["token_expiry"]
-        current_user.gmail_connected = True
+        # Update user's Gmail tokens
+        user.gmail_access_token = tokens["access_token"]
+        user.gmail_refresh_token = tokens["refresh_token"]
+        user.gmail_token_expiry = tokens["token_expiry"]
+        user.gmail_connected = True
 
         db.commit()
 
         # Redirect back to frontend with success
-        from fastapi.responses import RedirectResponse
         return RedirectResponse(
             url="https://agenticrag360.com/settings?gmail_connected=true",
             status_code=302
         )
 
+    except ValueError:
+        return RedirectResponse(
+            url=f"https://agenticrag360.com/settings?gmail_error=invalid_state",
+            status_code=302
+        )
     except Exception as e:
-        # Redirect back to frontend with error
-        from fastapi.responses import RedirectResponse
         return RedirectResponse(
             url=f"https://agenticrag360.com/settings?gmail_error={str(e)}",
             status_code=302
