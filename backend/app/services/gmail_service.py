@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import base64
 import email
+import os
 from email.mime.text import MIMEText
 from app.core.config import settings
 
@@ -96,14 +97,24 @@ class GmailService:
         emails = []
 
         try:
-            # Get list of messages
-            results = service.users().messages().list(
-                userId='me',
-                q=query,
-                maxResults=500  # Limit for MVP
-            ).execute()
+            # Get list of messages (fetch all matching messages with pagination)
+            messages = []
+            page_token = None
 
-            messages = results.get('messages', [])
+            while True:
+                results = service.users().messages().list(
+                    userId='me',
+                    q=query,
+                    maxResults=500,  # Max per page
+                    pageToken=page_token
+                ).execute()
+
+                messages.extend(results.get('messages', []))
+                page_token = results.get('nextPageToken')
+
+                # Break if no more pages
+                if not page_token:
+                    break
 
             for message in messages:
                 # Get full message details
@@ -241,19 +252,35 @@ class GmailService:
 
     @staticmethod
     def _get_attachments_info(payload: Dict) -> List[Dict]:
-        """Extract attachment information (PDFs only for MVP)."""
+        """
+        Extract attachment information from email payload.
+        Supports PDFs and images (jpg, jpeg, png, tiff, tif, webp, bmp).
+        """
         attachments = []
+        supported_extensions = {'.pdf', '.jpg', '.jpeg', '.png', '.tiff', '.tif', '.webp', '.bmp'}
 
-        if 'parts' in payload:
-            for part in payload['parts']:
-                if part.get('filename') and part['filename'].lower().endswith('.pdf'):
-                    attachments.append({
-                        "filename": part['filename'],
-                        "mime_type": part['mimeType'],
-                        "size": part['body'].get('size', 0),
-                        "attachment_id": part['body'].get('attachmentId')
-                    })
+        def _extract_from_part(part: Dict):
+            """Recursively extract attachments from email parts."""
+            if isinstance(part, dict):
+                filename = part.get('filename', '')
+                if filename:
+                    file_ext = os.path.splitext(filename.lower())[1]
+                    if file_ext in supported_extensions:
+                        attachment_id = part.get('body', {}).get('attachmentId')
+                        if attachment_id:
+                            attachments.append({
+                                "filename": filename,
+                                "mime_type": part.get('mimeType', 'application/octet-stream'),
+                                "size": part.get('body', {}).get('size', 0),
+                                "attachment_id": attachment_id
+                            })
 
+                # Check nested parts
+                if 'parts' in part:
+                    for subpart in part['parts']:
+                        _extract_from_part(subpart)
+
+        _extract_from_part(payload)
         return attachments
 
     @staticmethod
