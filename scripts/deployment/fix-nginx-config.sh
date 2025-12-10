@@ -1,3 +1,28 @@
+#!/bin/bash
+
+# Fix nginx.conf to have proper SSL configuration
+# This overwrites the local nginx.conf with the correct SSL version
+
+set -e
+
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo -e "${YELLOW}Fixing nginx.conf with SSL configuration...${NC}"
+echo ""
+
+cd /home/ubuntu/email2kg || cd ~/email2kg || exit 1
+
+# Backup existing nginx.conf
+if [ -f "frontend/nginx.conf" ]; then
+    cp frontend/nginx.conf frontend/nginx.conf.backup
+    echo -e "${GREEN}✅ Backed up existing nginx.conf${NC}"
+fi
+
+# Write the correct SSL-enabled nginx.conf
+cat > frontend/nginx.conf << 'EOF'
 # HTTP server - redirect to HTTPS
 server {
     listen 80;
@@ -45,7 +70,7 @@ server {
     # Proxy API requests to backend
     location /api/ {
         set $backend_upstream http://backend:8000;
-        proxy_pass $backend_upstream;
+        proxy_pass $backend_upstream/api/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -74,3 +99,21 @@ server {
         add_header Content-Type text/plain;
     }
 }
+EOF
+
+echo -e "${GREEN}✅ nginx.conf updated with SSL configuration${NC}"
+echo ""
+
+# Verify it has SSL
+if grep -q "listen 443 ssl" frontend/nginx.conf; then
+    echo -e "${GREEN}✅ Verified: nginx.conf has SSL (listen 443 ssl)${NC}"
+else
+    echo -e "${RED}❌ Error: SSL configuration not found after update${NC}"
+    exit 1
+fi
+
+echo ""
+echo -e "${GREEN}✅ nginx.conf is ready!${NC}"
+echo ""
+echo "Now run: sudo ./scripts/deployment/final-ssl-fix.sh"
+echo ""
