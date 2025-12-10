@@ -82,19 +82,19 @@ async def oauth_callback(
     # Check if user denied access
     if error:
         return RedirectResponse(
-            url=f"https://agenticrag360.com/settings?gmail_error=access_denied",
+            url=f"https://agenticrag360.com/gmail?gmail_error=access_denied",
             status_code=302
         )
 
     if not code:
         return RedirectResponse(
-            url=f"https://agenticrag360.com/settings?gmail_error=no_code",
+            url=f"https://agenticrag360.com/gmail?gmail_error=no_code",
             status_code=302
         )
 
     if not state:
         return RedirectResponse(
-            url=f"https://agenticrag360.com/settings?gmail_error=no_user_id",
+            url=f"https://agenticrag360.com/gmail?gmail_error=no_user_id",
             status_code=302
         )
 
@@ -106,7 +106,7 @@ async def oauth_callback(
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             return RedirectResponse(
-                url=f"https://agenticrag360.com/settings?gmail_error=user_not_found",
+                url=f"https://agenticrag360.com/gmail?gmail_error=user_not_found",
                 status_code=302
             )
 
@@ -123,18 +123,18 @@ async def oauth_callback(
 
         # Redirect back to frontend with success
         return RedirectResponse(
-            url="https://agenticrag360.com/settings?gmail_connected=true",
+            url="https://agenticrag360.com/gmail?gmail_connected=true",
             status_code=302
         )
 
     except ValueError:
         return RedirectResponse(
-            url=f"https://agenticrag360.com/settings?gmail_error=invalid_state",
+            url=f"https://agenticrag360.com/gmail?gmail_error=invalid_state",
             status_code=302
         )
     except Exception as e:
         return RedirectResponse(
-            url=f"https://agenticrag360.com/settings?gmail_error={str(e)}",
+            url=f"https://agenticrag360.com/gmail?gmail_error={str(e)}",
             status_code=302
         )
 
