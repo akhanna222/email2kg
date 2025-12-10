@@ -42,7 +42,6 @@ class GmailService:
         # Pass user_id as state to identify user after OAuth redirect
         auth_url, _ = flow.authorization_url(
             access_type='offline',
-            include_granted_scopes='true',
             prompt='consent',
             state=str(user_id)
         )
