@@ -19,16 +19,42 @@ class LLMService:
         else:
             raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
-    def classify_document(self, text: str) -> str:
+    def classify_document(
+        self,
+        text: str,
+        email_subject: Optional[str] = None,
+        email_body: Optional[str] = None
+    ) -> str:
         """
-        Classify document type using LLM.
+        Classify document type using LLM with email context.
+
+        Classification strategy:
+        1. Check email subject for keywords (invoice, receipt, statement, etc.)
+        2. Check email body for additional context
+        3. Use OCR-extracted text from attachment
+        4. Make final classification decision
 
         Args:
-            text: Extracted document text
+            text: Extracted document text from OCR
+            email_subject: Email subject line for context
+            email_body: Email body text for context
 
         Returns:
             Document type
         """
+        # Build context from email metadata
+        context_parts = []
+
+        if email_subject:
+            context_parts.append(f"Email Subject: {email_subject}")
+
+        if email_body:
+            # Limit email body to first 500 chars to save tokens
+            body_preview = email_body[:500]
+            context_parts.append(f"Email Body: {body_preview}")
+
+        email_context = "\n\n".join(context_parts) if context_parts else "No email context available."
+
         prompt = f"""Classify the following document into one of these categories:
 - invoice
 - receipt
@@ -41,8 +67,17 @@ class LLMService:
 - tax_document
 - other
 
-Document text:
-{text[:2000]}  # First 2000 chars to save tokens
+IMPORTANT: Use this classification strategy in order:
+1. First, check the email subject for clear indicators (e.g., "Invoice", "Receipt", "Statement")
+2. Then, check the email body for additional context about the document
+3. Finally, use the document text extracted from the attachment via OCR
+4. Make your classification based on ALL available information
+
+Email Context:
+{email_context}
+
+Document Text (from OCR):
+{text[:2000]}
 
 Respond with ONLY the category name, nothing else."""
 
@@ -59,21 +94,45 @@ Respond with ONLY the category name, nothing else."""
 
         return doc_type
 
-    def extract_structured_data(self, text: str, doc_type: str) -> Dict:
+    def extract_structured_data(
+        self,
+        text: str,
+        doc_type: str,
+        email_subject: Optional[str] = None,
+        email_body: Optional[str] = None
+    ) -> Dict:
         """
-        Extract structured data from document using LLM.
+        Extract structured data from document using LLM with email context.
 
         Args:
             text: Extracted document text
             doc_type: Document type (invoice, receipt, etc.)
+            email_subject: Email subject line for context
+            email_body: Email body text for context
 
         Returns:
             Dictionary with extracted fields
         """
+        # Build context from email metadata
+        context_parts = []
+
+        if email_subject:
+            context_parts.append(f"Email Subject: {email_subject}")
+
+        if email_body:
+            # Limit email body to first 500 chars to save tokens
+            body_preview = email_body[:500]
+            context_parts.append(f"Email Body: {body_preview}")
+
+        email_context = "\n\n".join(context_parts) if context_parts else "No email context available."
+
         prompt = f"""Extract structured information from this {doc_type}.
 
-Document text:
-{text[:3000]}  # First 3000 chars
+Email Context (use this to fill in missing fields if document text is unclear):
+{email_context}
+
+Document Text (from OCR):
+{text[:3000]}
 
 Extract the following fields and return as JSON:
 {{
@@ -91,6 +150,7 @@ Rules:
 - Extract amount as a number (e.g., 123.45)
 - Date should be in ISO format (YYYY-MM-DD)
 - merchant/vendor is the company or person providing goods/services
+- Use email context to supplement or clarify information from document text
 - Return valid JSON only, no other text
 
 JSON:"""

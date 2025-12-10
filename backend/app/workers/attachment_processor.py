@@ -138,9 +138,14 @@ def process_email_attachment(
         logger.info(f"Linked document {document.id} to email {email_id}")
 
         # Process the document (extract text, classify, extract structured data)
+        # Pass email context for better classification
         logger.info(f"Starting document processing for document {document.id}")
         processor = ProcessingService(self.db)
-        success = processor.process_document(document.id)
+        success = processor.process_document(
+            document.id,
+            email_subject=email.subject,
+            email_body=email.body_text
+        )
 
         if success:
             logger.info(f"Successfully processed document {document.id}")

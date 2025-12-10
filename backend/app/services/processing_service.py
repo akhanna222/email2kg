@@ -21,13 +21,20 @@ class ProcessingService:
         self.template_service = TemplateService(db)
         self.vision_ocr = VisionOCRService(api_key=settings.OPENAI_API_KEY)
 
-    def process_document(self, document_id: int) -> bool:
+    def process_document(
+        self,
+        document_id: int,
+        email_subject: Optional[str] = None,
+        email_body: Optional[str] = None
+    ) -> bool:
         """
         Process a document: extract text, classify, extract structured data,
         create entities and relationships.
 
         Args:
             document_id: ID of document to process
+            email_subject: Optional email subject for context-aware classification
+            email_body: Optional email body for context-aware classification
 
         Returns:
             True if successful, False otherwise
@@ -69,9 +76,13 @@ class ProcessingService:
                 self.db.commit()
                 return False
 
-            # Step 2: Classify document
+            # Step 2: Classify document using email context + OCR text
             start_time = time.time()
-            doc_type = self.llm_service.classify_document(extracted_text)
+            doc_type = self.llm_service.classify_document(
+                extracted_text,
+                email_subject=email_subject,
+                email_body=email_body
+            )
             document.document_type = DocumentType(doc_type)
 
             # Skip "other" documents in MVP1
@@ -111,7 +122,10 @@ class ProcessingService:
             if not structured_data:
                 print("Using LLM extraction (no template or template failed)")
                 structured_data = self.llm_service.extract_structured_data(
-                    extracted_text, doc_type
+                    extracted_text,
+                    doc_type,
+                    email_subject=email_subject,
+                    email_body=email_body
                 )
 
                 # If LLM extraction was successful, create a new template

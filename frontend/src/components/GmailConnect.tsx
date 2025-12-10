@@ -84,11 +84,20 @@ const GmailConnect: React.FC = () => {
       <div className="info">
         <h3>What will be synced?</h3>
         <ul>
-          <li>Last 3 months of emails</li>
+          <li>ALL emails from last 3 months (no limits)</li>
           <li>Email subject, sender, receiver, timestamp</li>
-          <li>Email body text (plain text only)</li>
-          <li>PDF attachments only</li>
+          <li>Email body text (used for smart classification)</li>
+          <li>PDF and image attachments (JPG, PNG, TIFF, etc.)</li>
+          <li>OCR text extraction from all attachments</li>
+          <li>Smart document classification using email context</li>
         </ul>
+        <h3>How does classification work?</h3>
+        <ol>
+          <li>Email subject is analyzed for keywords (invoice, receipt, etc.)</li>
+          <li>Email body is checked for additional context</li>
+          <li>OCR extracts text from PDF/image attachments</li>
+          <li>AI classifies into: invoice, receipt, statement, contract, etc.</li>
+        </ol>
       </div>
     </div>
   );
