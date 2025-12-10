@@ -67,11 +67,17 @@ class LLMService:
 - tax_document
 - other
 
-IMPORTANT: Use this classification strategy in order:
-1. First, check the email subject for clear indicators (e.g., "Invoice", "Receipt", "Statement")
-2. Then, check the email body for additional context about the document
-3. Finally, use the document text extracted from the attachment via OCR
-4. Make your classification based on ALL available information
+IMPORTANT Classification Rules:
+1. ALWAYS check email subject first for keywords (e.g., "Invoice", "Receipt", "Statement")
+2. Then check email body for additional context
+3. Analyze the document text from OCR extraction
+4. If document contains:
+   - Itemized lists/tables with prices → likely invoice, receipt, or quote
+   - Payment amounts and vendor info → invoice or receipt
+   - Bank transactions or account info → bank_statement
+   - Order numbers and product lists → purchase_order or sales_order
+5. ONLY use "other" if document truly doesn't fit any financial/business category
+6. When in doubt between similar categories, prefer the more specific one
 
 Email Context:
 {email_context}
