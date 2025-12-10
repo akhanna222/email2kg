@@ -84,6 +84,7 @@ export const getTransactions = async (params?: {
   date_to?: string;
   vendor?: string;
   doc_type?: string;
+  currency?: string;
   limit?: number;
   offset?: number;
 }): Promise<{ total: number; transactions: Transaction[] }> => {

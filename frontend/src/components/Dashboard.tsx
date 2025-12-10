@@ -86,7 +86,7 @@ const Dashboard: React.FC = () => {
         <div className="stat-card">
           <h3>Total Amount</h3>
           <p className="stat-value">
-            ${stats?.total_amount.toFixed(2) || '0.00'} {stats?.currency}
+            {stats?.total_amount.toFixed(2) || '0.00'} {stats?.currency}
           </p>
         </div>
       </div>

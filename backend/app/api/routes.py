@@ -411,6 +411,7 @@ async def get_transactions(
     date_to: Optional[str] = Query(None),
     vendor: Optional[str] = Query(None),
     doc_type: Optional[str] = Query(None),
+    currency: Optional[str] = Query(None),
     limit: int = Query(100, le=1000),
     offset: int = Query(0),
     db: Session = Depends(get_db),
@@ -442,6 +443,9 @@ async def get_transactions(
     if doc_type:
         query = query.filter(Transaction.transaction_type == doc_type)
 
+    if currency:
+        query = query.filter(Transaction.currency == currency)
+
     # Get total count
     total = query.count()
 
@@ -457,6 +461,16 @@ async def get_transactions(
         if txn.party:
             party_name = txn.party.name
 
+        # Get email_id through EmailDocumentLink
+        email_id = None
+        if txn.document_id:
+            from app.db.models import EmailDocumentLink
+            email_link = db.query(EmailDocumentLink).filter(
+                EmailDocumentLink.document_id == txn.document_id
+            ).first()
+            if email_link:
+                email_id = email_link.email_id
+
         results.append({
             "id": txn.id,
             "amount": txn.amount,
@@ -465,6 +479,7 @@ async def get_transactions(
             "type": txn.transaction_type,
             "vendor": party_name,
             "document_id": txn.document_id,
+            "email_id": email_id,
             "description": txn.description
         })
 
