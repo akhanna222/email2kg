@@ -59,6 +59,10 @@ class Document(Base):
     extracted_text = Column(Text)
     extracted_data = Column(JSON)  # Store the full JSON extraction
 
+    # Processing metrics
+    page_count = Column(Integer, default=0)  # Number of pages in document
+    character_count = Column(Integer, default=0)  # Number of characters extracted
+
     # User feedback
     needs_review = Column(Boolean, default=False)  # Flag for user review
     user_verified = Column(Boolean, default=False)  # User has verified extraction

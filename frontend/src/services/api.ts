@@ -134,3 +134,9 @@ export const getPartyGraph = async (partyId: number): Promise<any> => {
   const response = await api.get(`/graph/party/${partyId}`);
   return response.data;
 };
+
+// Processing Metrics
+export const getProcessingMetrics = async (): Promise<any> => {
+  const response = await api.get('/metrics/processing');
+  return response.data;
+};

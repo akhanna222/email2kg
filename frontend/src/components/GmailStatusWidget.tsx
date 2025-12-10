@@ -3,11 +3,21 @@
  * Shows connection status and provides quick connect/sync actions
  */
 import React, { useState, useEffect } from 'react';
-import { getGoogleAuthUrl, syncGmail, getCurrentUser, updateUserPreferences } from '../services/api';
+import { getGoogleAuthUrl, syncGmail, getCurrentUser, updateUserPreferences, getProcessingMetrics } from '../services/api';
 import './GmailStatusWidget.css';
 
 interface GmailStatusWidgetProps {
   compact?: boolean;
+}
+
+interface ProcessingMetrics {
+  total_emails: number;
+  emails_with_documents: number;
+  total_documents: number;
+  total_pages_processed: number;
+  total_characters_processed: number;
+  avg_pages_per_document: number;
+  avg_characters_per_document: number;
 }
 
 const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }) => {
@@ -17,6 +27,8 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
   const [error, setError] = useState<string | null>(null);
   const [emailLimit, setEmailLimit] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [metrics, setMetrics] = useState<ProcessingMetrics | null>(null);
+  const [showMetrics, setShowMetrics] = useState(false);
 
   useEffect(() => {
     checkConnectionStatus();
@@ -29,8 +41,22 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
       setConnected(user.gmail_connected);
       setLastSync(user.last_sync);
       setEmailLimit(user.preferences?.email_sync_limit || null);
+
+      // Fetch processing metrics if connected
+      if (user.gmail_connected) {
+        await loadMetrics();
+      }
     } catch (err) {
       console.error('Failed to check Gmail status:', err);
+    }
+  };
+
+  const loadMetrics = async () => {
+    try {
+      const data = await getProcessingMetrics();
+      setMetrics(data.summary);
+    } catch (err) {
+      console.error('Failed to load metrics:', err);
     }
   };
 
@@ -64,10 +90,11 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
     try {
       await syncGmail();
 
-      // Refresh connection status to get latest last_sync time
+      // Refresh connection status and metrics after sync
       setTimeout(() => {
         checkConnectionStatus();
-      }, 1000);
+        loadMetrics();
+      }, 2000); // Wait a bit longer for background processing to start
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Sync failed. Please try again.');
       console.error(err);
@@ -151,6 +178,59 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
                   {showSettings ? 'Hide' : 'Change'}
                 </button>
               </p>
+
+              {/* Processing Metrics */}
+              {metrics && (
+                <div style={{ marginTop: '1em' }}>
+                  <button
+                    onClick={() => setShowMetrics(!showMetrics)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#007bff',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      fontSize: '0.9em',
+                      padding: 0
+                    }}
+                  >
+                    📊 {showMetrics ? 'Hide' : 'Show'} Processing Metrics
+                  </button>
+                  {showMetrics && (
+                    <div style={{
+                      marginTop: '0.5em',
+                      padding: '1em',
+                      background: '#f8f9fa',
+                      borderRadius: '4px',
+                      fontSize: '0.85em'
+                    }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5em' }}>
+                        <div>
+                          <strong>Total Emails:</strong> {metrics.total_emails}
+                        </div>
+                        <div>
+                          <strong>With Documents:</strong> {metrics.emails_with_documents}
+                        </div>
+                        <div>
+                          <strong>Total Documents:</strong> {metrics.total_documents}
+                        </div>
+                        <div>
+                          <strong>Total Pages:</strong> {metrics.total_pages_processed.toLocaleString()}
+                        </div>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <strong>Total Characters:</strong> {metrics.total_characters_processed.toLocaleString()}
+                        </div>
+                        <div>
+                          <strong>Avg Pages/Doc:</strong> {metrics.avg_pages_per_document}
+                        </div>
+                        <div>
+                          <strong>Avg Chars/Doc:</strong> {Math.round(metrics.avg_characters_per_document).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {showSettings && (
                 <div style={{ marginTop: '1em', padding: '1em', background: '#f8f9fa', borderRadius: '4px' }}>
                   <p style={{ marginBottom: '0.5em', fontSize: '0.9em', fontWeight: 'bold' }}>Select email sync limit:</p>

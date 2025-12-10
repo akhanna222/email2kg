@@ -50,10 +50,20 @@ class ProcessingService:
 
             # Step 1: Extract text based on file type
             file_ext = os.path.splitext(document.file_path.lower())[1]
+            page_count = 0
 
             if file_ext == '.pdf':
                 # PDF extraction
                 extracted_text = self.pdf_service.extract_text(document.file_path)
+
+                # Get page count from metadata
+                try:
+                    metadata = self.pdf_service.get_metadata(document.file_path)
+                    page_count = metadata.get('num_pages', 0)
+                except Exception as e:
+                    print(f"Failed to get PDF metadata: {e}")
+                    page_count = 0
+
             elif file_ext in {'.jpg', '.jpeg', '.png', '.tiff', '.tif', '.webp', '.bmp'}:
                 # Image extraction using Vision OCR
                 ocr_result = self.vision_ocr.extract_text_from_image_file(
@@ -62,6 +72,7 @@ class ProcessingService:
                     detail_level="high"
                 )
                 extracted_text = ocr_result.get('text', '')
+                page_count = ocr_result.get('pages', 1)
             else:
                 # Unsupported file type
                 document.processing_status = ProcessingStatus.FAILED
@@ -69,6 +80,10 @@ class ProcessingService:
                 return False
 
             document.extracted_text = extracted_text
+
+            # Store metrics
+            document.page_count = page_count
+            document.character_count = len(extracted_text) if extracted_text else 0
 
             if not extracted_text or len(extracted_text.strip()) < 20:
                 # Not enough text to process
