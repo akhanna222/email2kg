@@ -160,7 +160,10 @@ async def sync_gmail(
 
         # Fetch emails
         emails = GmailService.fetch_emails(
-            current_user.gmail_access_token,
+            access_token=current_user.gmail_access_token,
+            refresh_token=current_user.gmail_refresh_token,
+            client_id=settings.GOOGLE_CLIENT_ID,
+            client_secret=settings.GOOGLE_CLIENT_SECRET,
             months=settings.EMAIL_FETCH_MONTHS,
             max_emails=email_limit
         )
