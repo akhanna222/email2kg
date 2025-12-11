@@ -144,12 +144,16 @@ async def oauth_callback(
 @router.post("/sync/gmail")
 async def sync_gmail(
     process_attachments: bool = Query(True, description="Automatically process attachments"),
+    filter_attachments: bool = Query(True, description="Only fetch emails with attachments or price-related content"),
+    months: int = Query(None, description="Number of months to fetch (default: 3, max: 12)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
     Sync emails from Gmail for the authenticated user.
     Optionally process attachments automatically in the background.
+    Can filter to only fetch emails with attachments or price/invoice keywords.
+    Allows custom month range selection.
     """
     if not current_user.gmail_access_token:
         raise HTTPException(status_code=401, detail="Gmail not connected")
@@ -158,7 +162,11 @@ async def sync_gmail(
         # Get email sync limit from user preferences (default: None = unlimited)
         email_limit = current_user.preferences.get('email_sync_limit') if current_user.preferences else None
 
-        # Fetch emails
+        # Determine how many months to fetch
+        fetch_months = months if months else settings.EMAIL_FETCH_MONTHS
+        fetch_months = min(fetch_months, 12)  # Cap at 12 months
+
+        # Fetch emails with optional filtering
         emails = GmailService.fetch_emails(
             access_token=current_user.gmail_access_token,
             refresh_token=current_user.gmail_refresh_token,
@@ -736,4 +744,111 @@ async def get_extraction_logs(
             }
             for log in logs
         ]
+    }
+
+
+# ========== Metrics Routes ==========
+
+@router.get("/metrics/processing")
+async def get_processing_metrics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get processing metrics including:
+    - Total emails processed
+    - Total pages processed
+    - Pages per email
+    - Total characters processed
+    - Characters per email
+    - Email qualification statistics
+    """
+    from sqlalchemy import func
+
+    # Get all emails with their linked documents
+    email_metrics = []
+
+    emails = db.query(Email).all()
+
+    total_emails = len(emails)
+    total_pages = 0
+    total_characters = 0
+    emails_with_documents = 0
+
+    # Qualification statistics
+    emails_qualified = 0
+    emails_not_qualified = 0
+    emails_pending_qualification = 0
+    qualified_by_subject = 0
+    qualified_by_body = 0
+
+    for email in emails:
+        # Track qualification stats
+        if email.is_qualified is None:
+            emails_pending_qualification += 1
+        elif email.is_qualified:
+            emails_qualified += 1
+            if email.qualification_stage == "subject":
+                qualified_by_subject += 1
+            elif email.qualification_stage == "body":
+                qualified_by_body += 1
+        else:
+            emails_not_qualified += 1
+        # Get linked documents for this email
+        links = db.query(EmailDocumentLink).filter(
+            EmailDocumentLink.email_id == email.id
+        ).all()
+
+        if links:
+            email_pages = 0
+            email_chars = 0
+
+            for link in links:
+                doc = db.query(Document).filter(Document.id == link.document_id).first()
+                if doc:
+                    email_pages += doc.page_count or 0
+                    email_chars += doc.character_count or 0
+
+            if email_pages > 0 or email_chars > 0:
+                emails_with_documents += 1
+                total_pages += email_pages
+                total_characters += email_chars
+
+                email_metrics.append({
+                    "email_id": email.id,
+                    "subject": email.subject,
+                    "pages": email_pages,
+                    "characters": email_chars,
+                    "timestamp": email.timestamp.isoformat() if email.timestamp else None
+                })
+
+    # Get document-level aggregated metrics
+    doc_stats = db.query(
+        func.count(Document.id).label('total_documents'),
+        func.sum(Document.page_count).label('sum_pages'),
+        func.sum(Document.character_count).label('sum_characters'),
+        func.avg(Document.page_count).label('avg_pages'),
+        func.avg(Document.character_count).label('avg_characters')
+    ).filter(
+        Document.user_id == current_user.id
+    ).first()
+
+    return {
+        "summary": {
+            "total_emails": total_emails,
+            "emails_with_documents": emails_with_documents,
+            "total_documents": doc_stats.total_documents or 0,
+            "total_pages_processed": int(doc_stats.sum_pages or 0),
+            "total_characters_processed": int(doc_stats.sum_characters or 0),
+            "avg_pages_per_document": round(float(doc_stats.avg_pages or 0), 2),
+            "avg_characters_per_document": round(float(doc_stats.avg_characters or 0), 2),
+            # Qualification statistics
+            "emails_qualified": emails_qualified,
+            "emails_not_qualified": emails_not_qualified,
+            "emails_pending_qualification": emails_pending_qualification,
+            "qualified_by_subject": qualified_by_subject,
+            "qualified_by_body": qualified_by_body,
+            "qualification_rate": round(emails_qualified / total_emails * 100, 1) if total_emails > 0 else 0
+        },
+        "per_email_metrics": email_metrics[:50]  # Limit to 50 most recent for performance
     }

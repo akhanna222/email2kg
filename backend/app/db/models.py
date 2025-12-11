@@ -37,6 +37,13 @@ class Email(Base):
     body_text = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # LLM qualification for processing
+    is_qualified = Column(Boolean, default=None, nullable=True)  # None = not checked yet
+    qualification_stage = Column(String, nullable=True)  # "subject", "body", or "none"
+    qualification_confidence = Column(Float, nullable=True)  # 0.0 to 1.0
+    qualification_reason = Column(Text, nullable=True)  # Explanation from LLM
+    qualified_at = Column(DateTime, nullable=True)  # When qualification was done
+
     # Relationships
     documents = relationship("Document", secondary="email_document_links", back_populates="emails")
 
@@ -58,6 +65,10 @@ class Document(Base):
     # Extracted data
     extracted_text = Column(Text)
     extracted_data = Column(JSON)  # Store the full JSON extraction
+
+    # Processing metrics
+    page_count = Column(Integer, default=0)  # Number of pages in document
+    character_count = Column(Integer, default=0)  # Number of characters extracted
 
     # User feedback
     needs_review = Column(Boolean, default=False)  # Flag for user review

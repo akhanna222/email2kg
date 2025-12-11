@@ -94,6 +94,7 @@ class GmailService:
             client_secret: Google Client Secret (required for refresh)
             months: Number of months to fetch (default 3)
             max_emails: Maximum number of emails to fetch (None = unlimited)
+            filter_attachments: If True, only fetch emails with attachments or price-related content
 
         Returns:
             List of email dictionaries
@@ -109,7 +110,22 @@ class GmailService:
 
         # Calculate date for filtering
         since_date = datetime.now() - timedelta(days=months * 30)
-        query = f'after:{since_date.strftime("%Y/%m/%d")}'
+
+        # Build query based on filters
+        if filter_attachments:
+            # Fetch emails with attachments OR price-related keywords
+            # Gmail search supports: has:attachment, subject:keyword, OR operator
+            query_parts = [
+                f'after:{since_date.strftime("%Y/%m/%d")}',
+                '(has:attachment OR',
+                'subject:(invoice OR receipt OR payment OR bill OR quote OR order OR purchase)',
+                'OR',
+                '(price OR $ OR USD OR amount OR total OR cost OR paid OR due OR invoice OR receipt))'
+            ]
+            query = ' '.join(query_parts)
+        else:
+            # Fetch all emails
+            query = f'after:{since_date.strftime("%Y/%m/%d")}'
 
         emails = []
 

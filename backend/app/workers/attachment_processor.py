@@ -15,6 +15,7 @@ from app.db.database import SessionLocal
 from app.db.models import Email, Document, EmailDocumentLink, ProcessingStatus, User
 from app.services.gmail_service import GmailService
 from app.services.processing_service import ProcessingService
+from app.services.llm_service import LLMService
 from app.core.config import settings
 
 logger = get_task_logger(__name__)
@@ -188,6 +189,12 @@ def process_all_email_attachments(
     """
     Process all attachments for a given email.
 
+    Uses LLM qualification to determine if email should be processed:
+    1. Check if email is already qualified
+    2. If not, qualify using LLM (subject first, then body)
+    3. If qualified, process attachments
+    4. If not qualified, skip processing
+
     Args:
         email_id: Database ID of the email
         user_id: ID of the user who owns the email
@@ -209,6 +216,39 @@ def process_all_email_attachments(
         if not user or not user.gmail_access_token:
             logger.error(f"User {user_id} not found or Gmail not connected")
             return {"status": "error", "message": "User not found or Gmail not connected"}
+
+        # Check if email needs qualification
+        if email.is_qualified is None:
+            logger.info(f"Qualifying email {email_id} using LLM")
+            llm_service = LLMService()
+
+            qualification = llm_service.qualify_email(
+                email_subject=email.subject,
+                email_body=email.body_text
+            )
+
+            # Store qualification result
+            email.is_qualified = qualification["qualified"]
+            email.qualification_stage = qualification["stage"]
+            email.qualification_confidence = qualification["confidence"]
+            email.qualification_reason = qualification["reason"]
+            email.qualified_at = datetime.now()
+            self.db.commit()
+
+            logger.info(
+                f"Email {email_id} qualification: {qualification['qualified']} "
+                f"(stage: {qualification['stage']}, confidence: {qualification['confidence']:.2f})"
+            )
+
+        # Skip processing if email is not qualified
+        if not email.is_qualified:
+            logger.info(f"Skipping email {email_id} - not qualified. Reason: {email.qualification_reason}")
+            return {
+                "status": "skipped",
+                "message": f"Email not qualified for processing",
+                "reason": email.qualification_reason,
+                "stage": email.qualification_stage
+            }
 
         # Fetch fresh email data to get attachments
         gmail_service = GmailService()
