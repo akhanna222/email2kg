@@ -3,11 +3,27 @@
  * Shows connection status and provides quick connect/sync actions
  */
 import React, { useState, useEffect } from 'react';
-import { getGoogleAuthUrl, syncGmail, getCurrentUser, updateUserPreferences } from '../services/api';
+import { getGoogleAuthUrl, syncGmail, getCurrentUser, updateUserPreferences, getProcessingMetrics } from '../services/api';
 import './GmailStatusWidget.css';
 
 interface GmailStatusWidgetProps {
   compact?: boolean;
+}
+
+interface ProcessingMetrics {
+  total_emails: number;
+  emails_with_documents: number;
+  total_documents: number;
+  total_pages_processed: number;
+  total_characters_processed: number;
+  avg_pages_per_document: number;
+  avg_characters_per_document: number;
+  emails_qualified: number;
+  emails_not_qualified: number;
+  emails_pending_qualification: number;
+  qualified_by_subject: number;
+  qualified_by_body: number;
+  qualification_rate: number;
 }
 
 const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }) => {
@@ -17,6 +33,9 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
   const [error, setError] = useState<string | null>(null);
   const [emailLimit, setEmailLimit] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [metrics, setMetrics] = useState<ProcessingMetrics | null>(null);
+  const [showMetrics, setShowMetrics] = useState(false);
+  const [syncMonths, setSyncMonths] = useState<number>(3);
 
   useEffect(() => {
     checkConnectionStatus();
@@ -29,8 +48,22 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
       setConnected(user.gmail_connected);
       setLastSync(user.last_sync);
       setEmailLimit(user.preferences?.email_sync_limit || null);
+
+      // Fetch processing metrics if connected
+      if (user.gmail_connected) {
+        await loadMetrics();
+      }
     } catch (err) {
       console.error('Failed to check Gmail status:', err);
+    }
+  };
+
+  const loadMetrics = async () => {
+    try {
+      const data = await getProcessingMetrics();
+      setMetrics(data.summary);
+    } catch (err) {
+      console.error('Failed to load metrics:', err);
     }
   };
 
@@ -62,12 +95,13 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
     setError(null);
 
     try {
-      await syncGmail();
+      await syncGmail(syncMonths);
 
-      // Refresh connection status to get latest last_sync time
+      // Refresh connection status and metrics after sync
       setTimeout(() => {
         checkConnectionStatus();
-      }, 1000);
+        loadMetrics();
+      }, 2000); // Wait a bit longer for background processing to start
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Sync failed. Please try again.');
       console.error(err);
@@ -151,6 +185,91 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
                   {showSettings ? 'Hide' : 'Change'}
                 </button>
               </p>
+
+              {/* Processing Metrics */}
+              {metrics && (
+                <div style={{ marginTop: '1em' }}>
+                  <button
+                    onClick={() => setShowMetrics(!showMetrics)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#007bff',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      fontSize: '0.9em',
+                      padding: 0
+                    }}
+                  >
+                    📊 {showMetrics ? 'Hide' : 'Show'} Processing Metrics
+                  </button>
+                  {showMetrics && (
+                    <div style={{
+                      marginTop: '0.5em',
+                      padding: '1em',
+                      background: '#f8f9fa',
+                      borderRadius: '4px',
+                      fontSize: '0.85em'
+                    }}>
+                      {/* Email Qualification Metrics */}
+                      <div style={{ marginBottom: '1em', paddingBottom: '1em', borderBottom: '1px solid #dee2e6' }}>
+                        <div style={{ fontWeight: 'bold', marginBottom: '0.5em', color: '#495057' }}>
+                          🤖 LLM Email Qualification
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5em' }}>
+                          <div>
+                            <strong>Qualified:</strong> {metrics.emails_qualified} ({metrics.qualification_rate}%)
+                          </div>
+                          <div>
+                            <strong>Not Qualified:</strong> {metrics.emails_not_qualified}
+                          </div>
+                          <div>
+                            <strong>By Subject:</strong> {metrics.qualified_by_subject}
+                          </div>
+                          <div>
+                            <strong>By Body:</strong> {metrics.qualified_by_body}
+                          </div>
+                          {metrics.emails_pending_qualification > 0 && (
+                            <div style={{ gridColumn: '1 / -1', color: '#856404' }}>
+                              <strong>Pending:</strong> {metrics.emails_pending_qualification}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Processing Metrics */}
+                      <div>
+                        <div style={{ fontWeight: 'bold', marginBottom: '0.5em', color: '#495057' }}>
+                          📄 Document Processing
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5em' }}>
+                          <div>
+                            <strong>Total Emails:</strong> {metrics.total_emails}
+                          </div>
+                          <div>
+                            <strong>With Documents:</strong> {metrics.emails_with_documents}
+                          </div>
+                          <div>
+                            <strong>Total Documents:</strong> {metrics.total_documents}
+                          </div>
+                          <div>
+                            <strong>Total Pages:</strong> {metrics.total_pages_processed.toLocaleString()}
+                          </div>
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <strong>Total Characters:</strong> {metrics.total_characters_processed.toLocaleString()}
+                          </div>
+                          <div>
+                            <strong>Avg Pages/Doc:</strong> {metrics.avg_pages_per_document}
+                          </div>
+                          <div>
+                            <strong>Avg Chars/Doc:</strong> {Math.round(metrics.avg_characters_per_document).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {showSettings && (
                 <div style={{ marginTop: '1em', padding: '1em', background: '#f8f9fa', borderRadius: '4px' }}>
                   <p style={{ marginBottom: '0.5em', fontSize: '0.9em', fontWeight: 'bold' }}>Select email sync limit:</p>
@@ -183,7 +302,30 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
               )}
             </div>
 
-            <div className="widget-actions">
+            {/* Month Selection */}
+            <div style={{ marginTop: '1em' }}>
+              <label style={{ fontSize: '0.9em', color: '#666', display: 'block', marginBottom: '0.5em' }}>
+                Sync emails from last:
+              </label>
+              <select
+                value={syncMonths}
+                onChange={(e) => setSyncMonths(Number(e.target.value))}
+                style={{
+                  padding: '0.5em',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  width: '100%',
+                  fontSize: '0.9em'
+                }}
+              >
+                <option value={1}>1 month</option>
+                <option value={3}>3 months (default)</option>
+                <option value={6}>6 months</option>
+                <option value={12}>12 months (1 year)</option>
+              </select>
+            </div>
+
+            <div className="widget-actions" style={{ marginTop: '1em' }}>
               <button
                 onClick={handleSync}
                 disabled={syncing}
@@ -196,7 +338,7 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
                   </>
                 ) : (
                   <>
-                    🔄 Sync Now
+                    🔄 Sync Now ({syncMonths} {syncMonths === 1 ? 'month' : 'months'})
                   </>
                 )}
               </button>

@@ -238,3 +238,145 @@ JSON:"""
         normalized = ' '.join(normalized.split())
 
         return normalized
+
+    def qualify_email(
+        self,
+        email_subject: Optional[str] = None,
+        email_body: Optional[str] = None
+    ) -> Dict[str, any]:
+        """
+        Qualify an email to determine if it should be processed for extraction.
+        Uses LLM to intelligently detect financial/business documents.
+
+        Two-stage process:
+        1. Check subject first (fast, low-cost)
+        2. If subject fails, check body (more thorough)
+        3. If both fail, bypass the email
+
+        Args:
+            email_subject: Email subject line
+            email_body: Email body text
+
+        Returns:
+            Dict with:
+            - qualified: bool - Whether email should be processed
+            - stage: str - Which stage qualified it ("subject", "body", or "none")
+            - confidence: float - Confidence score (0-1)
+            - reason: str - Explanation for the decision
+        """
+        # Stage 1: Check subject line
+        if email_subject:
+            subject_result = self._qualify_text(
+                text=email_subject,
+                stage="subject"
+            )
+
+            if subject_result["qualified"]:
+                return {
+                    "qualified": True,
+                    "stage": "subject",
+                    "confidence": subject_result["confidence"],
+                    "reason": subject_result["reason"]
+                }
+
+        # Stage 2: Check body if subject didn't qualify
+        if email_body:
+            # Limit body to first 1000 chars to save tokens
+            body_preview = email_body[:1000]
+
+            body_result = self._qualify_text(
+                text=body_preview,
+                stage="body"
+            )
+
+            if body_result["qualified"]:
+                return {
+                    "qualified": True,
+                    "stage": "body",
+                    "confidence": body_result["confidence"],
+                    "reason": body_result["reason"]
+                }
+
+        # Both stages failed - bypass email
+        return {
+            "qualified": False,
+            "stage": "none",
+            "confidence": 0.0,
+            "reason": "No financial or business document indicators found in subject or body"
+        }
+
+    def _qualify_text(self, text: str, stage: str) -> Dict[str, any]:
+        """
+        Use LLM to qualify a piece of text (subject or body).
+
+        Args:
+            text: Text to qualify
+            stage: "subject" or "body"
+
+        Returns:
+            Dict with qualified, confidence, and reason
+        """
+        prompt = f"""Analyze this email {stage} and determine if it contains a financial or business document that should be processed.
+
+Email {stage.title()}:
+{text}
+
+Documents to INCLUDE (qualify as YES):
+- Invoices, receipts, bills, payment confirmations
+- Bank statements, transaction records, account summaries
+- Purchase orders, sales orders, quotes, delivery notes
+- Contracts, agreements, tax documents
+- Expense reports, reimbursements
+- Shipping notifications with itemized costs
+- Subscription renewals with pricing
+- Any email mentioning monetary transactions, amounts, or financial documents
+
+Documents to EXCLUDE (qualify as NO):
+- Marketing emails, newsletters, promotions
+- Social media notifications
+- Personal correspondence without financial content
+- Spam, unsubscribe confirmations
+- Event invitations (unless they're paid events with invoices)
+- General updates or announcements without financial data
+
+Respond in this EXACT JSON format:
+{{
+    "qualified": true or false,
+    "confidence": 0.0 to 1.0,
+    "reason": "Brief explanation (one sentence)"
+}}
+
+JSON:"""
+
+        response = self._call_llm(prompt)
+
+        try:
+            # Parse JSON response
+            result = json.loads(response)
+            return {
+                "qualified": result.get("qualified", False),
+                "confidence": result.get("confidence", 0.0),
+                "reason": result.get("reason", "No reason provided")
+            }
+        except json.JSONDecodeError:
+            # Try to extract JSON from response
+            try:
+                start = response.find('{')
+                end = response.rfind('}') + 1
+                if start >= 0 and end > start:
+                    json_str = response[start:end]
+                    result = json.loads(json_str)
+                    return {
+                        "qualified": result.get("qualified", False),
+                        "confidence": result.get("confidence", 0.0),
+                        "reason": result.get("reason", "No reason provided")
+                    }
+            except:
+                pass
+
+            # Default to not qualified if parsing fails
+            return {
+                "qualified": False,
+                "confidence": 0.0,
+                "reason": "Failed to parse LLM response"
+            }
