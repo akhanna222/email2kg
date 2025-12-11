@@ -35,6 +35,7 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
   const [showSettings, setShowSettings] = useState(false);
   const [metrics, setMetrics] = useState<ProcessingMetrics | null>(null);
   const [showMetrics, setShowMetrics] = useState(false);
+  const [syncMonths, setSyncMonths] = useState<number>(3);
 
   useEffect(() => {
     checkConnectionStatus();
@@ -94,7 +95,7 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
     setError(null);
 
     try {
-      await syncGmail();
+      await syncGmail(syncMonths);
 
       // Refresh connection status and metrics after sync
       setTimeout(() => {
@@ -301,7 +302,30 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
               )}
             </div>
 
-            <div className="widget-actions">
+            {/* Month Selection */}
+            <div style={{ marginTop: '1em' }}>
+              <label style={{ fontSize: '0.9em', color: '#666', display: 'block', marginBottom: '0.5em' }}>
+                Sync emails from last:
+              </label>
+              <select
+                value={syncMonths}
+                onChange={(e) => setSyncMonths(Number(e.target.value))}
+                style={{
+                  padding: '0.5em',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  width: '100%',
+                  fontSize: '0.9em'
+                }}
+              >
+                <option value={1}>1 month</option>
+                <option value={3}>3 months (default)</option>
+                <option value={6}>6 months</option>
+                <option value={12}>12 months (1 year)</option>
+              </select>
+            </div>
+
+            <div className="widget-actions" style={{ marginTop: '1em' }}>
               <button
                 onClick={handleSync}
                 disabled={syncing}
@@ -314,7 +338,7 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
                   </>
                 ) : (
                   <>
-                    🔄 Sync Now
+                    🔄 Sync Now ({syncMonths} {syncMonths === 1 ? 'month' : 'months'})
                   </>
                 )}
               </button>

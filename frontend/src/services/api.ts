@@ -60,8 +60,9 @@ export const handleOAuthCallback = async (code: string) => {
 };
 
 // Email Sync
-export const syncGmail = async () => {
-  const response = await api.post('/sync/gmail');
+export const syncGmail = async (months?: number) => {
+  const params = months ? { months } : {};
+  const response = await api.post('/sync/gmail', null, { params });
   return response.data;
 };
 

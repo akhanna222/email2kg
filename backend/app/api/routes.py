@@ -145,6 +145,7 @@ async def oauth_callback(
 async def sync_gmail(
     process_attachments: bool = Query(True, description="Automatically process attachments"),
     filter_attachments: bool = Query(True, description="Only fetch emails with attachments or price-related content"),
+    months: int = Query(None, description="Number of months to fetch (default: 3, max: 12)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -152,6 +153,7 @@ async def sync_gmail(
     Sync emails from Gmail for the authenticated user.
     Optionally process attachments automatically in the background.
     Can filter to only fetch emails with attachments or price/invoice keywords.
+    Allows custom month range selection.
     """
     if not current_user.gmail_access_token:
         raise HTTPException(status_code=401, detail="Gmail not connected")
@@ -160,10 +162,14 @@ async def sync_gmail(
         # Get email sync limit from user preferences (default: None = unlimited)
         email_limit = current_user.preferences.get('email_sync_limit') if current_user.preferences else None
 
+        # Determine how many months to fetch
+        fetch_months = months if months else settings.EMAIL_FETCH_MONTHS
+        fetch_months = min(fetch_months, 12)  # Cap at 12 months
+
         # Fetch emails with optional filtering
         emails = GmailService.fetch_emails(
             current_user.gmail_access_token,
-            months=settings.EMAIL_FETCH_MONTHS,
+            months=fetch_months,
             max_emails=email_limit,
             filter_attachments=filter_attachments
         )
