@@ -169,6 +169,7 @@ async def sync_gmail(
         # Fetch emails with optional filtering
         emails = GmailService.fetch_emails(
             current_user.gmail_access_token,
+            current_user.gmail_refresh_token,
             months=fetch_months,
             max_emails=email_limit,
             filter_attachments=filter_attachments

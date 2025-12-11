@@ -90,6 +90,7 @@ def process_email_attachment(
         try:
             attachment_data = GmailService.download_attachment(
                 access_token=user.gmail_access_token,
+                refresh_token=user.gmail_refresh_token,
                 message_id=attachment_info["gmail_id"],
                 attachment_id=attachment_info["attachment_id"]
             )
