@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { Transaction, Document, Filters, Stats, QueryResult } from '../types';
 import { authService } from './authService';
 
@@ -13,22 +13,22 @@ const api = axios.create({
 
 // Add auth token to all requests
 api.interceptors.request.use(
-  (config) => {
+  (config: InternalAxiosRequestConfig) => {
     const token = authService.getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
+  (error: AxiosError) => {
     return Promise.reject(error);
   }
 );
 
 // Handle 401 unauthorized responses
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (response: AxiosResponse) => response,
+  (error: AxiosError) => {
     if (error.response?.status === 401) {
       // Token expired or invalid, logout user
       authService.logout();
@@ -55,7 +55,7 @@ export const getGoogleAuthUrl = async (): Promise<string> => {
 };
 
 export const handleOAuthCallback = async (code: string) => {
-  const response = await api.post('/auth/callback', { code });
+  const response = await api.get(`/auth/callback?code=${code}`);
   return response.data;
 };
 
