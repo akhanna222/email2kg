@@ -92,7 +92,10 @@ def process_email_attachment(
                 access_token=user.gmail_access_token,
                 refresh_token=user.gmail_refresh_token,
                 message_id=attachment_info["gmail_id"],
-                attachment_id=attachment_info["attachment_id"]
+                attachment_id=attachment_info["attachment_id"],
+                refresh_token=user.gmail_refresh_token,
+                client_id=settings.GOOGLE_CLIENT_ID,
+                client_secret=settings.GOOGLE_CLIENT_SECRET
             )
         except Exception as e:
             logger.error(f"Failed to download attachment: {e}")

@@ -76,13 +76,22 @@ class GmailService:
         }
 
     @staticmethod
-    def fetch_emails(access_token: str, refresh_token: Optional[str] = None, months: int = 3, max_emails: Optional[int] = None, filter_attachments: bool = False) -> List[Dict]:
+    def fetch_emails(
+        access_token: str,
+        refresh_token: Optional[str] = None,
+        client_id: Optional[str] = None,
+        client_secret: Optional[str] = None,
+        months: int = 3,
+        max_emails: Optional[int] = None
+    ) -> List[Dict]:
         """
         Fetch emails from Gmail.
 
         Args:
             access_token: OAuth access token
-            refresh_token: OAuth refresh token for automatic token refresh
+            refresh_token: OAuth refresh token (for auto-refresh)
+            client_id: Google Client ID (required for refresh)
+            client_secret: Google Client Secret (required for refresh)
             months: Number of months to fetch (default 3)
             max_emails: Maximum number of emails to fetch (None = unlimited)
             filter_attachments: If True, only fetch emails with attachments or price-related content
@@ -94,8 +103,8 @@ class GmailService:
             token=access_token,
             refresh_token=refresh_token,
             token_uri="https://oauth2.googleapis.com/token",
-            client_id=settings.GOOGLE_CLIENT_ID,
-            client_secret=settings.GOOGLE_CLIENT_SECRET
+            client_id=client_id,
+            client_secret=client_secret
         )
         service = build('gmail', 'v1', credentials=credentials)
 
@@ -319,14 +328,21 @@ class GmailService:
         return attachments
 
     @staticmethod
-    def download_attachment(access_token: str, refresh_token: Optional[str], message_id: str, attachment_id: str) -> bytes:
+    def download_attachment(
+        access_token: str,
+        message_id: str,
+        attachment_id: str,
+        refresh_token: Optional[str] = None,
+        client_id: Optional[str] = None,
+        client_secret: Optional[str] = None
+    ) -> bytes:
         """Download email attachment."""
         credentials = Credentials(
             token=access_token,
             refresh_token=refresh_token,
             token_uri="https://oauth2.googleapis.com/token",
-            client_id=settings.GOOGLE_CLIENT_ID,
-            client_secret=settings.GOOGLE_CLIENT_SECRET
+            client_id=client_id,
+            client_secret=client_secret
         )
         service = build('gmail', 'v1', credentials=credentials)
 
