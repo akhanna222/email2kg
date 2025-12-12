@@ -141,3 +141,9 @@ export const getProcessingMetrics = async (): Promise<any> => {
   const response = await api.get('/metrics/processing');
   return response.data;
 };
+
+// Email Activity Feed
+export const getRecentEmailActivity = async (limit: number = 20): Promise<any> => {
+  const response = await api.get('/emails/recent/activity', { params: { limit } });
+  return response.data;
+};

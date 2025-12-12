@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { getStats } from '../services/api';
 import { Stats } from '../types';
 import GmailStatusWidget from './GmailStatusWidget';
+import EmailActivityFeed from './EmailActivityFeed';
 
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [gmailMessage, setGmailMessage] = useState<string>('');
+  const [activityRefresh, setActivityRefresh] = useState(0);
 
   useEffect(() => {
     loadStats();
@@ -54,6 +56,12 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  const handleSyncComplete = () => {
+    // Refresh activity feed when sync completes
+    setActivityRefresh(prev => prev + 1);
+    loadStats();
+  };
+
   return (
     <div className="dashboard">
       <h1>Dashboard</h1>
@@ -64,30 +72,40 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Gmail Connection Status */}
-      <GmailStatusWidget />
+      {/* Main content with sidebar layout */}
+      <div className="dashboard-content">
+        <div className="dashboard-main">
+          {/* Gmail Connection Status */}
+          <GmailStatusWidget onSyncComplete={handleSyncComplete} />
 
-      <div className="stats-grid">
-        <div className="stat-card">
-          <h3>Total Transactions</h3>
-          <p className="stat-value">{stats?.total_transactions || 0}</p>
+          <div className="stats-grid">
+            <div className="stat-card">
+              <h3>Total Transactions</h3>
+              <p className="stat-value">{stats?.total_transactions || 0}</p>
+            </div>
+
+            <div className="stat-card">
+              <h3>Total Documents</h3>
+              <p className="stat-value">{stats?.total_documents || 0}</p>
+            </div>
+
+            <div className="stat-card">
+              <h3>Total Emails</h3>
+              <p className="stat-value">{stats?.total_emails || 0}</p>
+            </div>
+
+            <div className="stat-card">
+              <h3>Total Amount</h3>
+              <p className="stat-value">
+                {stats?.total_amount.toFixed(2) || '0.00'} {stats?.currency}
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="stat-card">
-          <h3>Total Documents</h3>
-          <p className="stat-value">{stats?.total_documents || 0}</p>
-        </div>
-
-        <div className="stat-card">
-          <h3>Total Emails</h3>
-          <p className="stat-value">{stats?.total_emails || 0}</p>
-        </div>
-
-        <div className="stat-card">
-          <h3>Total Amount</h3>
-          <p className="stat-value">
-            {stats?.total_amount.toFixed(2) || '0.00'} {stats?.currency}
-          </p>
+        {/* Activity Feed Sidebar */}
+        <div className="dashboard-sidebar">
+          <EmailActivityFeed refreshTrigger={activityRefresh} />
         </div>
       </div>
     </div>

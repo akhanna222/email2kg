@@ -12,6 +12,7 @@ from app.services.processing_service import ProcessingService
 from app.services.query_service import QueryService
 from app.services.graph_service import GraphService
 from app.services.template_service import TemplateService
+from app.services.llm_service import LLMService
 from app.core.config import settings
 from app.core.auth import get_current_active_user
 from pydantic import BaseModel
@@ -144,16 +145,13 @@ async def oauth_callback(
 @router.post("/sync/gmail")
 async def sync_gmail(
     process_attachments: bool = Query(True, description="Automatically process attachments"),
-    filter_attachments: bool = Query(True, description="Only fetch emails with attachments or price-related content"),
     months: int = Query(None, description="Number of months to fetch (default: 3, max: 12)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
     Sync emails from Gmail for the authenticated user.
-    Optionally process attachments automatically in the background.
-    Can filter to only fetch emails with attachments or price/invoice keywords.
-    Allows custom month range selection.
+    Uses LLM to qualify emails before processing.
     """
     if not current_user.gmail_access_token:
         raise HTTPException(status_code=401, detail="Gmail not connected")
@@ -166,7 +164,7 @@ async def sync_gmail(
         fetch_months = months if months else settings.EMAIL_FETCH_MONTHS
         fetch_months = min(fetch_months, 12)  # Cap at 12 months
 
-        # Fetch emails with optional filtering
+        # Fetch ALL emails (no filtering at Gmail level - we'll use LLM to qualify)
         emails = GmailService.fetch_emails(
             access_token=current_user.gmail_access_token,
             refresh_token=current_user.gmail_refresh_token,
@@ -176,7 +174,9 @@ async def sync_gmail(
             max_emails=email_limit
         )
 
+        llm_service = LLMService()
         new_count = 0
+        qualified_count = 0
         new_email_ids = []
 
         for email_data in emails:
@@ -186,28 +186,43 @@ async def sync_gmail(
             ).first()
 
             if not existing:
+                # Qualify email using LLM
+                qualification = llm_service.qualify_email(
+                    email_subject=email_data["subject"],
+                    email_body=email_data["body_text"]
+                )
+
                 email = Email(
                     gmail_id=email_data["gmail_id"],
                     subject=email_data["subject"],
                     sender=email_data["sender"],
                     receiver=email_data["receiver"],
                     timestamp=email_data["timestamp"],
-                    body_text=email_data["body_text"]
+                    body_text=email_data["body_text"],
+                    # Store qualification results
+                    is_qualified=qualification["qualified"],
+                    qualification_stage=qualification["stage"],
+                    qualification_confidence=qualification["confidence"],
+                    qualification_reason=qualification["reason"],
+                    qualified_at=datetime.utcnow()
                 )
                 db.add(email)
                 db.flush()  # Get ID without full commit
-                new_email_ids.append(email.id)
+
                 new_count += 1
+                if qualification["qualified"]:
+                    new_email_ids.append(email.id)
+                    qualified_count += 1
 
         db.commit()
         current_user.last_sync = datetime.utcnow()
         db.commit()
 
-        # Process attachments in background if requested
+        # Process attachments for qualified emails only
         attachments_queued = 0
         if process_attachments and new_email_ids:
             try:
-                # Queue bulk attachment processing
+                # Queue bulk attachment processing for qualified emails
                 result = bulk_process_email_attachments.apply_async(
                     args=[new_email_ids, current_user.id],
                     queue="attachments"
@@ -218,9 +233,10 @@ async def sync_gmail(
                 print(f"Warning: Failed to queue attachment processing: {e}")
 
         return {
-            "message": f"Synced {new_count} new emails",
+            "message": f"Synced {new_count} new emails ({qualified_count} qualified)",
             "total_fetched": len(emails),
             "new_emails": new_count,
+            "qualified_emails": qualified_count,
             "attachments_processing": process_attachments,
             "emails_queued_for_attachment_processing": attachments_queued
         }
@@ -350,6 +366,45 @@ async def get_email_detail(
         "body_text": email.body_text,
         "attached_documents": documents,
         "created_at": email.created_at.isoformat()
+    }
+
+
+@router.get("/emails/recent/activity")
+async def get_recent_email_activity(
+    limit: int = Query(20, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get recent emails with qualification activity for sync feed display.
+    Shows which emails were qualified/rejected and why.
+    """
+    emails = db.query(Email).order_by(Email.created_at.desc()).limit(limit).all()
+
+    results = []
+    for email in emails:
+        # Count linked documents
+        doc_count = db.query(EmailDocumentLink).filter(
+            EmailDocumentLink.email_id == email.id
+        ).count()
+
+        results.append({
+            "id": email.id,
+            "subject": email.subject,
+            "sender": email.sender,
+            "timestamp": email.timestamp.isoformat() if email.timestamp else None,
+            "created_at": email.created_at.isoformat(),
+            "is_qualified": email.is_qualified,
+            "qualification_stage": email.qualification_stage,
+            "qualification_confidence": email.qualification_confidence,
+            "qualification_reason": email.qualification_reason,
+            "qualified_at": email.qualified_at.isoformat() if email.qualified_at else None,
+            "attached_documents": doc_count
+        })
+
+    return {
+        "total": len(results),
+        "emails": results
     }
 
 

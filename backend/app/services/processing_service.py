@@ -193,12 +193,31 @@ class ProcessingService:
             document.processed_at = datetime.utcnow()
 
             self.db.commit()
+
+            # Step 7: Delete file after successful extraction (optional cleanup)
+            # Extracted text is stored in database, file no longer needed
+            try:
+                if os.path.exists(document.file_path):
+                    os.remove(document.file_path)
+                    print(f"Deleted temporary file: {document.file_path}")
+            except Exception as e:
+                print(f"Warning: Failed to delete file {document.file_path}: {e}")
+
             return True
 
         except Exception as e:
             print(f"Error processing document {document_id}: {e}")
             document.processing_status = ProcessingStatus.FAILED
             self.db.commit()
+
+            # Delete file on failure too (optional)
+            try:
+                if os.path.exists(document.file_path):
+                    os.remove(document.file_path)
+                    print(f"Deleted file after processing failure: {document.file_path}")
+            except Exception as cleanup_error:
+                print(f"Warning: Failed to delete file on error: {cleanup_error}")
+
             return False
 
     def _find_or_create_party(self, name: str) -> Party:

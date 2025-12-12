@@ -8,6 +8,7 @@ import './GmailStatusWidget.css';
 
 interface GmailStatusWidgetProps {
   compact?: boolean;
+  onSyncComplete?: () => void;
 }
 
 interface ProcessingMetrics {
@@ -26,7 +27,7 @@ interface ProcessingMetrics {
   qualification_rate: number;
 }
 
-const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }) => {
+const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false, onSyncComplete }) => {
   const [connected, setConnected] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
@@ -101,6 +102,10 @@ const GmailStatusWidget: React.FC<GmailStatusWidgetProps> = ({ compact = false }
       setTimeout(() => {
         checkConnectionStatus();
         loadMetrics();
+        // Notify parent component that sync completed
+        if (onSyncComplete) {
+          onSyncComplete();
+        }
       }, 2000); // Wait a bit longer for background processing to start
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Sync failed. Please try again.');
