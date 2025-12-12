@@ -2,7 +2,8 @@
  * Authentication service for managing user login, registration, and JWT tokens.
  */
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+// Auth routes don't have /api prefix on backend
+const API_BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:8000';
 
 export interface User {
   id: number;
