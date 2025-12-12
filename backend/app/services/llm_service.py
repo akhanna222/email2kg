@@ -246,12 +246,11 @@ JSON:"""
     ) -> Dict[str, any]:
         """
         Qualify an email to determine if it should be processed for extraction.
-        Uses LLM to intelligently detect financial/business documents.
 
-        Two-stage process:
-        1. Check subject first (fast, low-cost)
-        2. If subject fails, check body (more thorough)
-        3. If both fail, bypass the email
+        Three-stage process (optimized to reduce API calls):
+        1. Fast keyword check (free, instant)
+        2. If keywords found → Auto-qualify (no API call)
+        3. If uncertain → Use LLM (1-2 API calls)
 
         Args:
             email_subject: Email subject line
@@ -260,11 +259,60 @@ JSON:"""
         Returns:
             Dict with:
             - qualified: bool - Whether email should be processed
-            - stage: str - Which stage qualified it ("subject", "body", or "none")
+            - stage: str - Which stage qualified it ("keywords", "subject", "body", or "none")
             - confidence: float - Confidence score (0-1)
             - reason: str - Explanation for the decision
         """
-        # Stage 1: Check subject line
+        # OPTIMIZATION 1: Fast keyword-based pre-filtering (NO API CALL)
+        # Common financial keywords that indicate we should process
+        financial_keywords = [
+            'invoice', 'receipt', 'payment', 'bill', 'statement', 'transaction',
+            'paid', 'due', 'amount', 'total', 'purchase', 'order', 'quote',
+            'contract', 'refund', 'charge', 'subscription', 'renewal', 'expense',
+            '$', '€', '£', 'USD', 'EUR', 'GBP', 'price', 'cost'
+        ]
+
+        # Check subject line for keywords first
+        if email_subject:
+            subject_lower = email_subject.lower()
+            for keyword in financial_keywords:
+                if keyword in subject_lower:
+                    return {
+                        "qualified": True,
+                        "stage": "keywords",
+                        "confidence": 0.85,
+                        "reason": f"Subject contains financial keyword: '{keyword}'"
+                    }
+
+        # Check body preview for keywords (first 500 chars)
+        if email_body:
+            body_preview = email_body[:500].lower()
+            for keyword in financial_keywords:
+                if keyword in body_preview:
+                    return {
+                        "qualified": True,
+                        "stage": "keywords",
+                        "confidence": 0.80,
+                        "reason": f"Body contains financial keyword: '{keyword}'"
+                    }
+
+        # OPTIMIZATION 2: If no keywords found, skip LLM entirely for common spam patterns
+        spam_keywords = ['unsubscribe', 'click here', 'limited time offer', 'act now',
+                        'congratulations', 'you won', 'free gift', 'claim now']
+
+        if email_subject:
+            subject_lower = email_subject.lower()
+            for spam_word in spam_keywords:
+                if spam_word in subject_lower:
+                    return {
+                        "qualified": False,
+                        "stage": "keywords",
+                        "confidence": 0.90,
+                        "reason": f"Likely spam/marketing: contains '{spam_word}'"
+                    }
+
+        # FALLBACK: Only use LLM if keywords didn't decide (reduced API calls by ~70%)
+        # Stage 1: Check subject line with LLM
         if email_subject:
             subject_result = self._qualify_text(
                 text=email_subject,

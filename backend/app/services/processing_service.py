@@ -65,14 +65,12 @@ class ProcessingService:
                     page_count = 0
 
             elif file_ext in {'.jpg', '.jpeg', '.png', '.tiff', '.tif', '.webp', '.bmp'}:
-                # Image extraction using Vision OCR
-                ocr_result = self.vision_ocr.extract_text_from_image_file(
-                    document.file_path,
-                    extract_structure=False,
-                    detail_level="high"
-                )
-                extracted_text = ocr_result.get('text', '')
-                page_count = ocr_result.get('pages', 1)
+                # OPTIMIZATION: Skip image files to avoid expensive Vision OCR
+                # User requested: Don't use Vision model for images
+                print(f"Skipping image file to avoid Vision OCR costs: {document.file_path}")
+                document.processing_status = ProcessingStatus.FAILED
+                self.db.commit()
+                return False
             else:
                 # Unsupported file type
                 document.processing_status = ProcessingStatus.FAILED
