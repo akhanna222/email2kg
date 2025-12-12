@@ -368,6 +368,45 @@ async def get_email_detail(
     }
 
 
+@router.get("/emails/recent/activity")
+async def get_recent_email_activity(
+    limit: int = Query(20, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get recent emails with qualification activity for sync feed display.
+    Shows which emails were qualified/rejected and why.
+    """
+    emails = db.query(Email).order_by(Email.created_at.desc()).limit(limit).all()
+
+    results = []
+    for email in emails:
+        # Count linked documents
+        doc_count = db.query(EmailDocumentLink).filter(
+            EmailDocumentLink.email_id == email.id
+        ).count()
+
+        results.append({
+            "id": email.id,
+            "subject": email.subject,
+            "sender": email.sender,
+            "timestamp": email.timestamp.isoformat() if email.timestamp else None,
+            "created_at": email.created_at.isoformat(),
+            "is_qualified": email.is_qualified,
+            "qualification_stage": email.qualification_stage,
+            "qualification_confidence": email.qualification_confidence,
+            "qualification_reason": email.qualification_reason,
+            "qualified_at": email.qualified_at.isoformat() if email.qualified_at else None,
+            "attached_documents": doc_count
+        })
+
+    return {
+        "total": len(results),
+        "emails": results
+    }
+
+
 # ========== Document Upload Routes ==========
 
 @router.post("/upload/pdf", response_model=UploadResponse)
