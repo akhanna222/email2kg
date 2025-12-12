@@ -249,11 +249,17 @@ def process_all_email_attachments(
             }
 
         # Fetch fresh email data to get attachments
-        gmail_service = GmailService()
         from googleapiclient.discovery import build
         from google.oauth2.credentials import Credentials
+        from app.core.config import settings
 
-        credentials = Credentials(token=user.gmail_access_token)
+        credentials = Credentials(
+            token=user.gmail_access_token,
+            refresh_token=user.gmail_refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=settings.GOOGLE_CLIENT_ID,
+            client_secret=settings.GOOGLE_CLIENT_SECRET
+        )
         service = build('gmail', 'v1', credentials=credentials)
 
         # Get full message details
