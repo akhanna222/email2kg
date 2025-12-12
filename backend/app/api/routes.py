@@ -170,7 +170,7 @@ async def sync_gmail(
             refresh_token=current_user.gmail_refresh_token,
             client_id=settings.GOOGLE_CLIENT_ID,
             client_secret=settings.GOOGLE_CLIENT_SECRET,
-            months=settings.EMAIL_FETCH_MONTHS,
+            months=fetch_months,  # Use user-selected months, not settings default
             max_emails=email_limit
         )
 
