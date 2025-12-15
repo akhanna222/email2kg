@@ -32,7 +32,7 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 10080
-      ALLOWED_ORIGINS: '["http://localhost","http://localhost:3000","https://agenticrag360.com","http://agenticrag360.com:3000","http://agenticrag360.com:8000","http://34.245.37.71:3000","http://34.245.37.71:8000"]'
+      ALLOWED_ORIGINS: '["http://localhost","http://localhost:3000","https://agenticrag360.com","http://agenticrag360.com:3000","http://agenticrag360.com:8000","http://3.249.111.100:3000","http://3.249.111.100:8000"]'
       UPLOAD_DIR: /app/uploads
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
