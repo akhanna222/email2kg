@@ -205,6 +205,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Override API URL for local/development use
+        # For production: Use https://agenticrag360.com/api
+        # For local: Use http://localhost:8000/api
+        REACT_APP_API_URL: ${FRONTEND_API_URL:-http://localhost:8000/api}
     container_name: email2kg-frontend
     ports:
       - "80:80"    # HTTP (redirects to HTTPS)
