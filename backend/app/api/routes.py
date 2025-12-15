@@ -434,7 +434,7 @@ async def upload_pdf(
 
     try:
         # Generate unique filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{file.filename}"
         file_path = os.path.join(settings.UPLOAD_DIR, filename)
 
