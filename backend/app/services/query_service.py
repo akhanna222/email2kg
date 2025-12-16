@@ -42,7 +42,7 @@ class QueryService:
         Returns:
             Dictionary with total spend and breakdown
         """
-        since_date = datetime.now() - timedelta(days=months * 30)
+        since_date = datetime.utcnow() - timedelta(days=months * 30)
 
         # Base query joining with Document for user filtering
         base_query = self.db.query(Transaction).join(Document)
@@ -85,7 +85,7 @@ class QueryService:
             "total": round(total, 2),
             "currency": "USD",
             "period_start": since_date.isoformat(),
-            "period_end": datetime.now().isoformat(),
+            "period_end": datetime.utcnow().isoformat(),
             "breakdown_by_type": [
                 {"type": t[0], "amount": round(t[1], 2)}
                 for t in by_type

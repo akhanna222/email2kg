@@ -109,7 +109,7 @@ class GmailService:
         service = build('gmail', 'v1', credentials=credentials)
 
         # Calculate date for filtering
-        since_date = datetime.now() - timedelta(days=months * 30)
+        since_date = datetime.utcnow() - timedelta(days=months * 30)
 
         # Build query based on filters
         if filter_attachments:
@@ -202,7 +202,7 @@ class GmailService:
         try:
             timestamp = datetime.strptime(date_str, '%a, %d %b %Y %H:%M:%S %z')
         except:
-            timestamp = datetime.now()
+            timestamp = datetime.utcnow()
 
         # Extract body
         body_text = GmailService._get_email_body(msg['payload'])

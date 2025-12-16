@@ -38,6 +38,35 @@ class AuthService {
   private readonly USER_KEY = 'email2kg_user';
 
   /**
+   * Helper to safely parse error responses
+   */
+  private async parseErrorResponse(response: Response): Promise<string> {
+    const contentType = response.headers.get('content-type');
+
+    // Check if response is JSON
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        const error = await response.json();
+        return error.detail || error.message || 'Request failed';
+      } catch (e) {
+        return `Request failed with status ${response.status}`;
+      }
+    }
+
+    // If not JSON, try to get text (might be HTML error page)
+    try {
+      const text = await response.text();
+      // If it's HTML, return a generic message
+      if (text.startsWith('<')) {
+        return `Server error (${response.status}): Unable to connect to API. Please check if the backend is running.`;
+      }
+      return text || `Request failed with status ${response.status}`;
+    } catch (e) {
+      return `Request failed with status ${response.status}`;
+    }
+  }
+
+  /**
    * Register a new user
    */
   async register(data: RegisterData): Promise<User> {
@@ -50,8 +79,8 @@ class AuthService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Registration failed');
+      const errorMessage = await this.parseErrorResponse(response);
+      throw new Error(errorMessage);
     }
 
     return response.json();
@@ -70,8 +99,8 @@ class AuthService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Login failed');
+      const errorMessage = await this.parseErrorResponse(response);
+      throw new Error(errorMessage);
     }
 
     const tokenData: AuthToken = await response.json();
@@ -138,8 +167,8 @@ class AuthService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Profile update failed');
+      const errorMessage = await this.parseErrorResponse(response);
+      throw new Error(errorMessage);
     }
 
     const user = await response.json();
@@ -169,8 +198,8 @@ class AuthService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Password change failed');
+      const errorMessage = await this.parseErrorResponse(response);
+      throw new Error(errorMessage);
     }
   }
 

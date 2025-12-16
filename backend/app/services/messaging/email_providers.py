@@ -253,7 +253,7 @@ class OutlookProvider(BaseMessagingProvider):
         return {
             'access_token': tokens['access_token'],
             'refresh_token': tokens.get('refresh_token'),
-            'token_expiry': datetime.now() + timedelta(seconds=tokens['expires_in']),
+            'token_expiry': datetime.utcnow() + timedelta(seconds=tokens['expires_in']),
             'provider': 'outlook'
         }
 
@@ -278,7 +278,7 @@ class OutlookProvider(BaseMessagingProvider):
 
         return {
             'access_token': tokens['access_token'],
-            'token_expiry': datetime.now() + timedelta(seconds=tokens['expires_in'])
+            'token_expiry': datetime.utcnow() + timedelta(seconds=tokens['expires_in'])
         }
 
     def fetch_messages(

@@ -92,7 +92,6 @@ def process_email_attachment(
                 access_token=user.gmail_access_token,
                 message_id=attachment_info["gmail_id"],
                 attachment_id=attachment_info["attachment_id"],
-                refresh_token=user.gmail_refresh_token,
                 client_id=settings.GOOGLE_CLIENT_ID,
                 client_secret=settings.GOOGLE_CLIENT_SECRET
             )
@@ -102,7 +101,7 @@ def process_email_attachment(
             raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
 
         # Generate unique filename and save
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         safe_filename = f"{timestamp}_email_{email_id}_{filename}"
         file_path = os.path.join(settings.UPLOAD_DIR, safe_filename)
 
@@ -232,7 +231,7 @@ def process_all_email_attachments(
             email.qualification_stage = qualification["stage"]
             email.qualification_confidence = qualification["confidence"]
             email.qualification_reason = qualification["reason"]
-            email.qualified_at = datetime.now()
+            email.qualified_at = datetime.utcnow()
             self.db.commit()
 
             logger.info(
