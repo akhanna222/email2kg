@@ -82,7 +82,8 @@ class GmailService:
         client_id: Optional[str] = None,
         client_secret: Optional[str] = None,
         months: int = 3,
-        max_emails: Optional[int] = None
+        max_emails: Optional[int] = None,
+        filter_attachments: bool = False
     ) -> List[Dict]:
         """
         Fetch emails from Gmail.
