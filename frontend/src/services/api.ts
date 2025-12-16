@@ -3,9 +3,18 @@ import { Transaction, Document, Filters, Stats, QueryResult } from '../types';
 import { authService } from './authService';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+const AUTH_BASE_URL = API_BASE_URL.replace('/api', ''); // Remove /api for auth endpoints
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Separate axios instance for auth endpoints (no /api prefix)
+const authApi = axios.create({
+  baseURL: AUTH_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -25,37 +34,58 @@ api.interceptors.request.use(
   }
 );
 
-// Handle 401 unauthorized responses
-api.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid, logout user
-      authService.logout();
-      window.location.href = '/login';
+// Add auth token to auth API requests too
+authApi.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    const token = authService.getToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
+    return config;
+  },
+  (error: AxiosError) => {
     return Promise.reject(error);
   }
 );
 
-// Auth
+// Handle 401 unauthorized responses
+const handle401 = (error: AxiosError) => {
+  if (error.response?.status === 401) {
+    // Token expired or invalid, logout user
+    authService.logout();
+    window.location.href = '/login';
+  }
+  return Promise.reject(error);
+};
+
+api.interceptors.response.use(
+  (response: AxiosResponse) => response,
+  handle401
+);
+
+authApi.interceptors.response.use(
+  (response: AxiosResponse) => response,
+  handle401
+);
+
+// Auth - Use authApi for auth endpoints
 export const getCurrentUser = async (): Promise<any> => {
-  const response = await api.get('/auth/me');
+  const response = await authApi.get('/auth/me');
   return response.data;
 };
 
 export const updateUserPreferences = async (preferences: { email_sync_limit?: number | null }): Promise<any> => {
-  const response = await api.patch('/auth/me/preferences', preferences);
+  const response = await authApi.patch('/auth/me/preferences', preferences);
   return response.data;
 };
 
 export const getGoogleAuthUrl = async (): Promise<string> => {
-  const response = await api.get('/auth/google');
+  const response = await authApi.get('/auth/google');
   return response.data.auth_url;
 };
 
 export const handleOAuthCallback = async (code: string) => {
-  const response = await api.get(`/auth/callback?code=${code}`);
+  const response = await authApi.get(`/auth/callback?code=${code}`);
   return response.data;
 };
 

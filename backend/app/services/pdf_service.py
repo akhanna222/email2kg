@@ -21,33 +21,62 @@ class PDFService:
         self.vision_ocr = VisionOCRService(api_key=settings.OPENAI_API_KEY)
 
     @staticmethod
+    def has_images(file_path: str) -> bool:
+        """
+        Check if PDF contains images.
+
+        Returns:
+            True if PDF has images, False otherwise
+        """
+        try:
+            with open(file_path, 'rb') as file:
+                pdf_reader = PyPDF2.PdfReader(file)
+                for page in pdf_reader.pages:
+                    if '/XObject' in page['/Resources']:
+                        xobjects = page['/Resources']['/XObject'].get_object()
+                        for obj in xobjects:
+                            if xobjects[obj]['/Subtype'] == '/Image':
+                                return True
+            return False
+        except Exception as e:
+            print(f"Image detection failed: {e}")
+            # If we can't detect, assume it might have images to be safe
+            return True
+
+    @staticmethod
     def extract_text(file_path: str) -> str:
         """
-        Extract text from PDF with intelligent fallback strategy.
+        Extract text from PDF - OPTIMIZED to avoid expensive Vision OCR.
 
-        Strategy:
-        1. Try PyPDF2 first (fast for text-based PDFs)
-        2. If insufficient text, use Vision OCR (98-99% accuracy)
+        Strategy (OPTIMIZED):
+        1. Try PyPDF2 first (fast, free for text-based PDFs)
+        2. If insufficient text + no images → Likely scanned, skip it (save cost)
+        3. If has images → Skip entirely (user requested - no Vision OCR)
 
         Args:
             file_path: Path to the PDF file
 
         Returns:
-            Extracted text content
+            Extracted text content (empty string if skipped)
         """
-        # Try direct text extraction first (fast)
+        # Try direct text extraction first (fast, free)
         text = PDFService._extract_with_pypdf(file_path)
 
-        # If text is too short, the PDF is likely scanned - use Vision OCR
-        if len(text.strip()) < 50:
-            service = PDFService()
-            ocr_result = service.vision_ocr.extract_text_from_pdf(
-                file_path,
-                extract_structure=False,  # Just text for now
-                detail_level="high"
-            )
-            text = ocr_result.get('text', '')
+        # OPTIMIZATION: If we got good text, return it (no Vision OCR needed)
+        if len(text.strip()) >= 50:
+            return text
 
+        # OPTIMIZATION: Check if PDF has images
+        has_images = PDFService.has_images(file_path)
+
+        if has_images:
+            # User requested: Skip PDFs with images to avoid Vision OCR costs
+            print(f"Skipping PDF with images (no Vision OCR): {file_path}")
+            return ""  # Return empty - will be marked as failed
+
+        # If text-only but too short, it's likely corrupted or empty
+        # Don't use Vision OCR - just return what we got
+        print(f"PDF has minimal text and no images, skipping Vision OCR: {file_path}")
         return text
 
     @staticmethod

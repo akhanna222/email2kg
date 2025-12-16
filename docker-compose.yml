@@ -205,6 +205,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # API URL for frontend to call backend
+        # Production default: https://agenticrag360.com/api
+        # Can override via .env: FRONTEND_API_URL=https://yourdomain.com/api
+        REACT_APP_API_URL: ${FRONTEND_API_URL:-https://agenticrag360.com/api}
     container_name: email2kg-frontend
     ports:
       - "80:80"    # HTTP (redirects to HTTPS)

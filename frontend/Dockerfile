@@ -15,9 +15,12 @@ RUN npm install --legacy-peer-deps && \
 # Copy source code
 COPY . .
 
-# Set API URL for production build
-# Using HTTPS without port for cleaner URLs (nginx will proxy to backend:8000)
-ENV REACT_APP_API_URL=https://agenticrag360.com/api
+# Set API URL for build
+# Can be overridden via docker-compose build args
+# Default: Production (https://agenticrag360.com/api)
+# Override: Local testing (http://localhost:8000/api)
+ARG REACT_APP_API_URL=https://agenticrag360.com/api
+ENV REACT_APP_API_URL=${REACT_APP_API_URL}
 
 # Build the application
 RUN npm run build
